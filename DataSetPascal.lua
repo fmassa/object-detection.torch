@@ -1,6 +1,3 @@
-require 'torch'
-require 'image'
-require 'xlua'
 local matio = require 'matio'
 local argcheck = require 'argcheck'
 local xml = require 'xml'
@@ -21,39 +18,38 @@ local function lines_from(file)
 end
 
 --
+
+
+local env = require 'argcheck.env' -- retrieve argcheck environement
+-- this is the default type function
+-- which can be overrided by the user
+function env.istype(obj, typename)
+  local t = torch.type(obj)
+  if t:find('torch.*Tensor') then
+    return 'torch.Tensor' == typename
+  end
+  return torch.type(obj) == typename
+end
+
+
 local initcheck = argcheck{
   pack=true,
   noordered=true,
   help=[[
     A dataset class for object detection in Pascal-like datasets.
 ]],
-  {name="with_hard_samples",
-   type="boolean",
-   help="",
-   default = false},
   {name="image_set",
    type="string",
-   help="",
-   default="train"},
-  {name="year",
-   type="number",
-   help="",
-   default = 2012},
+   help="ImageSet name"},
   {name="datadir",
    type="string",
-   help="",
-   default = "/home/francisco/work/datasets/VOCdevkit/"},
-  {name="roidbdir",
-   type="string",
-   help="",
-   default = "/home/francisco/work/libraries/rcnn/data/selective_search_data/"},
-  {name="imgsetpath",
-   type="string",
-   help="",
-   default=""},
+   help="Path to dataset (follows standard Pascal folder structure)",
+   check=function(datadir)
+           return paths.dirp(datadir)
+         end},
   {name="classes",
    type="table",
-   help="",
+   help="Classes to be considered",
    default = {'aeroplane','bicycle','bird','boat','bottle','bus','car',
               'cat','chair','cow','diningtable','dog','horse','motorbike',
               'person','pottedplant','sheep','sofa','train','tvmonitor'},
@@ -66,18 +62,42 @@ local initcheck = argcheck{
         end
       end
       return out
-     end}--[[,
+     end},
+  {name="imgsetpath",
+   type="string",
+   help="Path to the ImageSet file",
+   opt = true},
+  {name="with_hard_samples",
+   type="boolean",
+   help="Use difficult samples in the proposals",
+   opt = true},
+  {name="year",
+   type="number",
+   help="Year of the dataset (for Pascal)",
+   opt = true},
+  {name="roidbdir",
+   type="string",
+   help="Path to the folder with the bounding boxes",
+   opt = true},
   {name="annopath",
    type="string",
-   help="",
+   help="Path to the annotations",
    opt = true},
   {name="imgpath",
    type="string",
-   help="",
+   help="Path to the images",
    opt = true},
   {name="roidbfile",
    type="string",
-   help="",
+   help="Mat file with the bounding boxes",
+   opt = true},
+  {name="dataset_name",
+   type="string",
+   help="Name of the dataset",
+   opt = true}--[[,
+  {name="image",
+   type="torch.Tensor",
+   help="Dataset of one single image",
    opt = true}]]
 }
 
@@ -88,20 +108,27 @@ function DataSetPascal:__init(...)
   for k,v in pairs(args) do self[k] = v end
   
   local image_set = self.image_set
+
+  if not self.year then
+    self.year = 2007
+  end
   local year = self.year
-  
-  self.dataset = 'VOC'..year
+    
+  if not self.dataset_name then
+    self.dataset_name = 'VOC'..year
+  end
   
   if not self.annopath then
-    self.annopath = paths.concat(self.datadir,self.dataset,'Annotations','%s.xml')
+    self.annopath = paths.concat(self.datadir,self.dataset_name,'Annotations','%s.xml')
   end
   if not self.imgpath then
-    self.imgpath = paths.concat(self.datadir,self.dataset,'JPEGImages','%s.jpg')
+    self.imgpath = paths.concat(self.datadir,self.dataset_name,'JPEGImages','%s.jpg')
   end
-  if not self.imgsetpath or self.imgsetpath=='' then
-    self.imgsetpath = paths.concat(self.datadir,self.dataset,'ImageSets','Main','%s.txt')
+  if not self.imgsetpath then
+    self.imgsetpath = paths.concat(self.datadir,self.dataset_name,'ImageSets','Main','%s.txt')
   end
-  if not self.roidbfile then
+    
+  if not self.roidbfile and self.roidbdir then
     self.roidbfile = paths.concat(self.roidbdir,'voc_'..year..'_'..image_set..'.mat')
   end
   
@@ -113,6 +140,12 @@ function DataSetPascal:__init(...)
     
   self.img_ids = lines_from(string.format(self.imgsetpath,image_set))
   self.num_imgs = #self.img_ids
+  
+  -- 
+  if self.image then
+    self.img_ids = {}
+  end
+  
   --[[
   self.sizes = {}
   print('Getting Image Sizes')
@@ -182,8 +215,11 @@ function DataSetPascal:loadROIDB()
   if self.roidb then
     return
   end
+  local roidbfile = self.roidbfile
   
-  local dt = matio.load(self.roidbfile)
+  assert(roidbfile and paths.filep(roidbfile),'Need to specify the bounding boxes file')
+  
+  local dt = matio.load(roidbfile)
   
   for i=1,#dt.images do
     --assert(dt.images[i]==self.img_ids[i])
@@ -196,7 +232,7 @@ function DataSetPascal:loadROIDB()
       table.insert(self.roidb,torch.IntTensor(0,4))
     else
       table.insert(self.roidb, dt.boxes[i]:index(2,torch.LongTensor{2,1,4,3}):int())
-  end
+    end
   end
   
 end

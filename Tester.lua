@@ -1,5 +1,5 @@
 require 'xlua'
-require 'mattorch'
+--require 'mattorch'
 
 local Tester = torch.class('nnf.Tester')
 
@@ -11,10 +11,10 @@ function Tester:__init(module,feat_provider)
 
   self.feat_dim = {256*50}
   self.batch_size = 128
-  self.max_batch_size = 15000
+  self.max_batch_size = 4000
   
-  self.cachefolder = 'results_regression'
-  self.cachename = 'pascal3d_val_ds2.data'
+  self.cachefolder = nil
+  self.cachename = nil
   self.verbose = true
 end
 
@@ -26,28 +26,24 @@ function Tester:validate(criterion)
   if paths.filep(tname) then
     valData = torch.load(tname)
   else
-    -- batch_provider need to be set
+    -- batch_provider need to be set before
     valData = {}
-    valData.batches,valData.targets = self.batch_provider:getBatch()
+    valData.inputs,valData.targets = self.batch_provider:getBatch()
     torch.save(tname,valData)
     self.batch_provider = nil
   end
 
-  --local valData = torch.load('pascal3d_val_ds2.data')
-  local batch_size = valData.batches:size(2)
-  local num_batches = valData.batches:size(1)
-  
+  local num_batches = valData.inputs:size(1)
   local module = self.module
-  
-  --local output_size = module:get(module:size()).weight:size(1)
-  
-  --local output = torch.Tensor(num_batches,batch_size,output_size)
+
   local err = 0
+  local inputs = torch.CudaTensor()
+  local targets = torch.CudaTensor()
   for t=1,num_batches do
     xlua.progress(t,num_batches)
     
-    local inputs = valData.batches[t]:cuda()
-    local targets = valData.targets[t]:float():cuda()
+    inputs:resize(valData.inputs[t]:size()):copy(valData.inputs[t])
+    targets:resize(valData.targets[t]:size()):copy(valData.targets[t])
     
     local output = module:forward(inputs)
     
@@ -65,7 +61,6 @@ function Tester:test(iteration)
   local dataset = self.dataset
   local module = self.module
   local feat_provider = self.feat_provider
-  --local batch_size = self.batch_size
 
   local pathfolder = paths.concat(self.cachefolder,'test_iter'..iteration)
   paths.mkdir(pathfolder)  
@@ -73,8 +68,13 @@ function Tester:test(iteration)
   module:evaluate()
   dataset:loadROIDB()
   
-  local feats = torch.Tensor():float()
-  local output = torch.Tensor():cuda()--float()
+  local feats = torch.FloatTensor()
+  local feats_batched = {}
+  local feats_cuda = torch.CudaTensor()
+  
+  local output = torch.FloatTensor()
+  
+  local output_dim = module:get(module:size())
   
   local boxes
   
@@ -82,31 +82,26 @@ function Tester:test(iteration)
     xlua.progress(i,dataset:size())
     boxes = dataset.roidb[i]
     local num_boxes = boxes:size(1)
-    
-    --local batch_size = num_boxes > self.max_batch_size and self.batch_size or num_boxes
-    --local num_batches = math.ceil(num_boxes/batch_size)
-    --local batch_rest = num_boxes%batch_size
-    
-    --feats:resize(batch_size,unpack(feat_dim))
+
     feats:resize(num_boxes,unpack(self.feat_dim))
     for idx=1,num_boxes do
       feats[idx] = feat_provider:getFeature(i,boxes[idx])
     end
-    output = module:forward(feats:cuda())
+    torch.split(feats_batched,self.max_batch_size,1)
     
-    --[[ make more general later, not in the mood
-    for b = 1,num_batches-1 do
-    
-      for idx=1,batch_size do
-        feats[idx] = feat_provider:getFeature(i,boxes[(b-1)*batch_size + idx])
+    for idx,f in ipairs(feats_batched) do
+      local fs = f:size(1)
+      feats_cuda:resize(fs,unpack(self.feat_dim)):copy(f)
+      module:forward(feats_cuda)
+      if idx == 1 then
+        local out_size = module.output:size()
+        output:resize(num_boxes,unpack(out_size[{{2,-1}}]:totable()))
       end
-      
-      output = module:forward(feats)
-      
-    end]]
-    collectgarbage()
-    --torch.save(paths.concat(self.cachefolder,module.experiment,))
-    mattorch.save(paths.concat(pathfolder,dataset.img_ids[i]..'.mat'),output:double())
+      output:narrow(1,(idx-1)*self.max_batch_size+1,fs):copy(module.output)
+    end
+
+    --collectgarbage()
+    --mattorch.save(paths.concat(pathfolder,dataset.img_ids[i]..'.mat'),output:double())
   end
   
   -- clean roidb to free memory

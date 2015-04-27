@@ -1,4 +1,8 @@
 require 'nn'
+require 'image'
+require 'inn'
+require 'xlua'
+
 nnf = {}
 
 torch.include('nnf','DataSetPascal.lua')

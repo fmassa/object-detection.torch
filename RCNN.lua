@@ -34,14 +34,6 @@ local function prepareImage(I,typ)
   return I
 end
 
-local function round(num)
-  if num >= 0 then 
-    return math.floor(num+.5)
-  else 
-    return math.ceil(num-.5)
-  end
-end
-
 function RCNN:getCrop(im_idx,bbox,flip)
   -- suppose I is in BGR, as image_mean
   -- [x1 y1 x2 y2] order
@@ -92,10 +84,10 @@ function RCNN:getCrop(im_idx,bbox,flip)
         half_height = half_width;
       end
     end
-    bbox[1] = round(center[1] - half_width  * scale)
-    bbox[2] = round(center[2] - half_height * scale)
-    bbox[3] = round(center[1] + half_width  * scale)
-    bbox[4] = round(center[2] + half_height * scale)
+    bbox[1] = torch.round(center[1] - half_width  * scale)
+    bbox[2] = torch.round(center[2] - half_height * scale)
+    bbox[3] = torch.round(center[1] + half_width  * scale)
+    bbox[4] = torch.round(center[2] + half_height * scale)
 
     local unclipped_height = bbox[4]-bbox[2]+1;
     local unclipped_width = bbox[3]-bbox[1]+1;
@@ -111,10 +103,10 @@ function RCNN:getCrop(im_idx,bbox,flip)
     local clipped_width = bbox[3]-bbox[1]+1;
     local scale_x = crop_size/unclipped_width;
     local scale_y = crop_size/unclipped_height;
-    crop_width = round(clipped_width*scale_x);
-    crop_height = round(clipped_height*scale_y);
-    pad_x1 = round(pad_x1*scale_x);
-    pad_y1 = round(pad_y1*scale_y);
+    crop_width = torch.round(clipped_width*scale_x);
+    crop_height = torch.round(clipped_height*scale_y);
+    pad_x1 = torch.round(pad_x1*scale_x);
+    pad_y1 = torch.round(pad_y1*scale_y);
 
     pad_h = pad_y1;
     pad_w = pad_x1;

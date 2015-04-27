@@ -47,69 +47,59 @@ function BatchProvider:__init(feat_provider)
   self.target_dim = 2
   
   self.do_flip = true
-
-  self.cachedir = '/home/francisco/work/projects/pose_estimation/cachedir/batch_provider/'
-  self:setupData()
+  
+  --self:setupData()
 end
 
 
 function BatchProvider:setupData()
-  local cachefile = paths.concat(self.cachedir,self.dataset.image_set..'.t7')
-  if false and paths.filep(cachefile) then
-    print('Loading BatchProvider from '..cachefile)
-    self.bboxes = torch.load(cachefile)
-  else
+  local dataset = self.dataset
+  local bb = {}
+  local bbT = {}
 
-    local dataset = self.dataset
-    local bb = {}
-    local bbT = {}
+  for i=0,dataset.num_classes do -- 0 because of background
+    bb[i] = {}
+  end
+
+  for i=1,dataset.num_imgs do
+    bbT[i] = {}
+  end
+
+  for i = 1,dataset.num_imgs do
+    if dataset.num_imgs > 10 then
+      xlua.progress(i,dataset.num_imgs)
+    end
+    
+    local rec = dataset:attachProposals(i)
   
+    for j=1,rec:size() do    
+      local id = rec.label[j]
+      local is_fg = (rec.overlap[j] >= self.fg_threshold)
+      local is_bg = (not is_fg) and (rec.overlap[j] >= self.bg_threshold[1]  and
+                                     rec.overlap[j] <  self.bg_threshold[2])
+      if is_fg then
+        local window = self.createWindow(rec,i,j,is_bg)
+        table.insert(bb[1], window) -- could be id instead of 1
+      elseif is_bg then
+        local window = self.createWindow(rec,i,j,is_bg)
+        table.insert(bb[0], window)
+      end
+      
+    end
+    
+    for j=0,dataset.num_classes do -- 0 because of background
+      if #bb[j] > 0 then
+        bbT[i][j] = torch.FloatTensor(bb[j])
+      end
+    end
+        
+    bb = {}
     for i=0,dataset.num_classes do -- 0 because of background
       bb[i] = {}
     end
-    
-    for i=1,dataset.num_imgs do
-      bbT[i] = {}
-    end
-  
-    for i = 1,dataset.num_imgs do
-      if dataset.num_imgs > 10 then
-        xlua.progress(i,dataset.num_imgs)
-      end
-    
-      local rec = dataset:attachProposals(i)
-    
-      for j=1,rec:size() do    
-        local id = rec.label[j]
-        local is_fg = (rec.overlap[j] >= self.fg_threshold)
-        local is_bg = (not is_fg) and (rec.overlap[j] >= self.bg_threshold[1]  and
-                                       rec.overlap[j] <  self.bg_threshold[2])
-        if is_fg then
-          local window = self.createWindow(rec,i,j,is_bg)
-          table.insert(bb[1], window) -- could be id instead of 1
-        elseif is_bg then
-          local window = self.createWindow(rec,i,j,is_bg)
-          table.insert(bb[0], window)
-        end
-      
-      end
-    
-      for j=0,dataset.num_classes do -- 0 because of background
-        if #bb[j] > 0 then
-          bbT[i][j] = torch.FloatTensor(bb[j])
-        end
-      end
-        
-      bb = {}
-      for i=0,dataset.num_classes do -- 0 because of background
-        bb[i] = {}
-      end
-      collectgarbage()
-    end
-    paths.mkdir(self.cachedir)
-    torch.save(cachefile,bbT)
-    self.bboxes = bbT
+    collectgarbage()
   end
+  self.bboxes = bbT
   --return bbT
 end
 
@@ -264,8 +254,8 @@ function BatchProvider:getBatch()
   local targets = torch.IntTensor(self.iter_per_batch,self.batch_size,self.target_dim)
   
   
-  local fg_rnd_idx = torch.randperm(self.fg_num_total)
-  local bg_rnd_idx = torch.randperm(self.bg_num_total)
+  local fg_rnd_idx = self.fg_num_total>0 and torch.randperm(self.fg_num_total) or torch.Tensor()
+  local bg_rnd_idx = self.bg_num_total>0 and torch.randperm(self.bg_num_total) or torch.Tensor()
   local fg_counter = 0
   local bg_counter = 0
   
@@ -277,7 +267,6 @@ function BatchProvider:getBatch()
     xlua.progress(i,opts.img_idx_end)
     
     local curr_idx = opts.img_idx[i]
-    --local imName = dataset.img_ids[curr_idx]
     
     local nfg = fg_w[curr_idx] and #fg_w[curr_idx] or 0
     local nbg = bg_w[curr_idx] and #bg_w[curr_idx] or 0

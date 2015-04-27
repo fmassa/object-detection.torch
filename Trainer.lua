@@ -25,9 +25,11 @@ end
 
 function Trainer:train(inputs,targets)
   -- only for batches
+  assert(targets:dim()>2,'Trainer is only for batches')
+  
   self.module:training()
-  self._input = self._input or torch.CudaTensor()--:type(self:type())
-  self._target = self._target or torch.CudaTensor()--:type(self:type())
+  self._input = self._input or torch.CudaTensor()
+  self._target = self._target or torch.CudaTensor()
 
   local module = self.module
   local parameters = self.parameters
@@ -46,13 +48,12 @@ function Trainer:train(inputs,targets)
   
   self._input:resize(inputs[1]:size())
   self._target:resize(targets[1]:size())
-  local input = self._input --torch.CudaTensor(inputs[1]:size())
-  local target = self._target --torch.CudaTensor(targets[1]:size())
+  local input = self._input
+  local target = self._target
+  
   for t=1,maxIter do
     xlua.progress(t,maxIter)
-    
---    local input = inputs[t]
---    local target = targets[t]
+
     input:copy(inputs[t])
     target:copy(targets[t])
 
@@ -75,7 +76,7 @@ function Trainer:train(inputs,targets)
       end
 
       if self.confusion then
-        self.confusion:batchAdd(outputs:exp(),target)
+        self.confusion:batchAdd(outputs,target)
       end
 
       return f,gradParameters
