@@ -1,6 +1,6 @@
 ## Object detection in torch
 
-Implementation of some object detection frameworks in [torch](torch.ch).
+Implementation of some object detection frameworks in [torch](http://torch.ch).
 
 ### Dependencies
 
@@ -34,4 +34,11 @@ First, clone this repo
 git clone https://github.com/fmassa/object-detection.torch.git
 ```
 
+To finetune the network for detection, run
+```
+th main.lua
+```
+
+The default is to consider that the dataset is present in `datasets/VOCdevkit/VOC2007/`.
+The default location of bounding boxes `.mat` files (in RCNN format) is supposed to be in `data/selective_search_data/`.
 

@@ -150,10 +150,13 @@ val_err = {}
 val_counter = 0
 reduc_counter = 0
 
+inputs = torch.FloatTensor()
+targets = torch.IntTensor()
+
 for i=1,opt.num_iter do
 
   print('Iteration: '..i..'/'..opt.num_iter)
-  inputs,targets = batch_provider:getBatch()
+  batch_provider:getBatch(inputs,targets)
   print('==> Training '..exp_name)
   trainer:train(inputs,targets)
   print('==> Training Error: '..trainer.fx[i])
@@ -220,5 +223,5 @@ tester = nnf.Tester(classifier,feat_provider_test)
 tester.cachefolder = paths.concat(opt.save,'evaluation',ds_test.dataset_name)
 
 
-tester:test(num_iter)
+tester:test(opt.num_iter)
 

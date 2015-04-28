@@ -153,12 +153,12 @@ function BatchProvider:permuteIdx()
   return fg_windows,bg_windows,opts
 end
 
--- could be modified for specific types of data
+
 function BatchProvider:selectBBoxes(fg_windows,bg_windows)
   local fg_w = {}
   local bg_w = {}
 
-  local window_idx = torch.randperm(#bg_windows)
+  local window_idx = #bg_windows>0 and torch.randperm(#bg_windows) or torch.Tensor()
   for i=1,self.bg_num_total do
     local curr_idx = bg_windows[window_idx[i] ][1]
     local position = bg_windows[window_idx[i] ][2]
@@ -166,12 +166,10 @@ function BatchProvider:selectBBoxes(fg_windows,bg_windows)
       bg_w[curr_idx] = {}
     end
     local dd = self.bboxes[curr_idx][0][position]
-    --local cl = getClass(dd[6],datasetType)
-    --table.insert(bg_w[curr_idx],{dd[1],dd[2],dd[3],dd[4],dd[5],dd[6]})--,dd[7]})
     table.insert(bg_w[curr_idx],dd)
   end
   
-  window_idx = torch.randperm(#fg_windows)
+  window_idx = #fg_windows>0 and torch.randperm(#fg_windows) or torch.Tensor()
   for i=1,self.fg_num_total do
     local curr_idx = fg_windows[window_idx[i] ][1]
     local position = fg_windows[window_idx[i] ][2]
@@ -179,8 +177,6 @@ function BatchProvider:selectBBoxes(fg_windows,bg_windows)
       fg_w[curr_idx] = {}
     end
     local dd = self.bboxes[curr_idx][1][position]
-    --local cl = getClass(dd[6],datasetType)
-    --table.insert(fg_w[curr_idx],{dd[1],dd[2],dd[3],dd[4],dd[5],dd[6]})--,dd[7]})
     table.insert(fg_w[curr_idx],dd)
   end
   
@@ -194,17 +190,16 @@ local function flip_angle(x)
 end
 
 -- depends on the model
-function BatchProvider:prepareFeatures(im_idx,bboxes)
+function BatchProvider:prepareFeatures(im_idx,bboxes,fg_data,bg_data,fg_label,bg_label)
 
   local num_pos = bboxes[1] and #bboxes[1] or 0
   local num_neg = bboxes[0] and #bboxes[0] or 0
 
-  local fg_data,bg_data,fg_label,bg_label
-  fg_data = torch.FloatTensor(num_pos,unpack(self.batch_dim))
-  bg_data = torch.FloatTensor(num_neg,unpack(self.batch_dim))
+  fg_data:resize(num_pos,unpack(self.batch_dim))
+  bg_data:resize(num_neg,unpack(self.batch_dim))
   
-  fg_label = torch.IntTensor(num_pos,self.target_dim)
-  bg_label = torch.IntTensor(num_neg,self.target_dim)
+  fg_label:resize(num_pos,self.target_dim)
+  bg_label:resize(num_neg,self.target_dim)
   
   local flip = false
   if self.do_flip then
@@ -236,10 +231,10 @@ function BatchProvider:prepareFeatures(im_idx,bboxes)
     end]]
   end
   
-  return fg_data,bg_data,fg_label,bg_label
+--  return fg_data,bg_data,fg_label,bg_label
 end
 
-function BatchProvider:getBatch()
+function BatchProvider:getBatch(batches,targets)
   local dataset = self.dataset
   
   self.fg_num_each = self.fg_fraction * self.batch_size
@@ -250,9 +245,11 @@ function BatchProvider:getBatch()
   local fg_windows,bg_windows,opts = self:permuteIdx()
   local fg_w,bg_w = self:selectBBoxes(fg_windows,bg_windows)
     
-  local batches = torch.FloatTensor(self.iter_per_batch,self.batch_size,unpack(self.batch_dim))
-  local targets = torch.IntTensor(self.iter_per_batch,self.batch_size,self.target_dim)
+  --local batches = torch.FloatTensor(self.iter_per_batch,self.batch_size,unpack(self.batch_dim))
+  --local targets = torch.IntTensor(self.iter_per_batch,self.batch_size,self.target_dim)
   
+  batches:resize(self.iter_per_batch,self.batch_size,unpack(self.batch_dim))
+  targets:resize(self.iter_per_batch,self.batch_size,self.target_dim)
   
   local fg_rnd_idx = self.fg_num_total>0 and torch.randperm(self.fg_num_total) or torch.Tensor()
   local bg_rnd_idx = self.bg_num_total>0 and torch.randperm(self.bg_num_total) or torch.Tensor()
@@ -260,6 +257,10 @@ function BatchProvider:getBatch()
   local bg_counter = 0
   
   local fg_data,bg_data,fg_label,bg_label
+  fg_data  = torch.FloatTensor()
+  bg_data  = torch.FloatTensor()
+  fg_label = torch.IntTensor()
+  bg_label = torch.IntTensor()
   
   print('==> Preparing Batch Data')
   for i=1,opts.img_idx_end do
@@ -278,7 +279,7 @@ function BatchProvider:getBatch()
     bboxes[0] = bg_w[curr_idx]
     bboxes[1] = fg_w[curr_idx]
   
-    fg_data,bg_data,fg_label,bg_label = self:prepareFeatures(curr_idx,bboxes)
+    self:prepareFeatures(curr_idx,bboxes,fg_data,bg_data,fg_label,bg_label)
     
     for j=1,nbg do
       bg_counter = bg_counter + 1
@@ -299,10 +300,10 @@ function BatchProvider:getBatch()
     end
     
     if i%50==0 then
-      collectgarbage()
+      collectgarbage() -- no need anymore ?
     end
     
   end
 
-  return batches,targets
+--  return batches,targets
 end

@@ -221,20 +221,28 @@ function DataSetPascal:loadROIDB()
   
   local dt = matio.load(roidbfile)
   
+  self.roidb = {}
+  local img2roidb = {}
+  -- compat: change coordinate order from [y1 x1 y2 x2] to [x1 y1 x2 y2]
   for i=1,#dt.images do
-    --assert(dt.images[i]==self.img_ids[i])
+    img2roidb[dt.images[i] ] = i
   end
   
-  self.roidb = {}
-  -- compat: change coordinate order from [y1 x1 y2 x2] to [x1 y1 x2 y2]
-  for i=1,#self.img_ids do --#dt.images do
-    if dt.boxes[i]:size(2) ~= 4 then
+  for i=1,self:size() do
+    if dt.boxes[img2roidb[self.img_ids[i] ] ]:size(2) ~= 4 then
       table.insert(self.roidb,torch.IntTensor(0,4))
     else
-      table.insert(self.roidb, dt.boxes[i]:index(2,torch.LongTensor{2,1,4,3}):int())
+      table.insert(self.roidb, dt.boxes[img2roidb[self.img_ids[i] ] ]:index(2,torch.LongTensor{2,1,4,3}):int())
     end
   end
   
+end
+
+function DataSetPascal:getROIDB(i)
+  if not self.roidb then
+    self:loadROIDB()
+  end
+  return self.roidb[i]--self.roidb[self.img2roidb[self.img_ids[i] ] ]
 end
 
 local function boxoverlap(a,b)
@@ -272,7 +280,7 @@ function DataSetPascal:attachProposals(i)
   end
 
   local anno = self:getAnnotation(i)
-  local boxes = self.roidb[i]
+  local boxes = self:getROIDB(i)
   
   local gt_boxes
   local gt_classes = {}
