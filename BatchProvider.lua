@@ -44,7 +44,7 @@ function BatchProvider:__init(feat_provider)
   self.createWindow = createWindowBase--createWindowAngle
   
   self.batch_dim = {256*50}
-  self.target_dim = 2
+  self.target_dim = 1
   
   self.do_flip = true
   

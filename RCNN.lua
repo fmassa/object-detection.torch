@@ -42,7 +42,7 @@ function RCNN:getCrop(im_idx,bbox,flip)
   if self.curr_im_idx ~= im_idx or self.curr_doflip ~= flip then
     self.curr_im_idx = im_idx
     self.curr_im_feats = self.dataset:getImage(im_idx):float()
-    self.curr_im_feats = prepareImage(self.curr_im_feats)
+    self.curr_im_feats = prepareImage(self.curr_im_feats,2)
     if flip then
       self.curr_im_feats = image.hflip(self.curr_im_feats)
     end

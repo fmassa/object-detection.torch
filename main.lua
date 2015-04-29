@@ -42,11 +42,14 @@ else
   ds_train = nnf.DataSetPascal{image_set='trainval',classes=classes,year=opt.year,
                          datadir=opt.datadir,roidbdir=opt.roidbdir}
   
+  local feat_dim
   if opt.algo == 'SPP' then
     feat_provider = nnf.SPP(ds_train,features)--:float()
     feat_provider.cachedir = paths.concat(opt.cache,'features',opt.netType)
+    feat_dim = {256*50}
   elseif opt.algo == 'RCNN' then
     feat_provider = nnf.RCNN(ds_train)
+    feat_dim = {3,feat_provider.crop_size,feat_provider.crop_size}
   else
     error(("Detection framework '%s' not available"):format(opt.algo))
   end
@@ -58,6 +61,7 @@ else
   batch_provider.fg_fraction = opt.fg_frac
   batch_provider.bg_threshold = {0.0,0.5}
   batch_provider.do_flip = true
+  batch_provider.batch_dim = feat_dim
   batch_provider:setupData()
   
   torch.save(trainCache,batch_provider)
@@ -71,13 +75,15 @@ if paths.filep(testCache) then
 else
   ds_test = nnf.DataSetPascal{image_set='test',classes=classes,year=opt.year,
                               datadir=opt.datadir,roidbdir=opt.roidbdir}
-  
+  local feat_dim
   if opt.algo == 'SPP' then
     feat_provider_test = nnf.SPP(ds_test,features)--:float()
     feat_provider_test.randomscale = false
     feat_provider_test.cachedir = paths.concat(opt.cache,'features',opt.netType)
+    feat_dim = {256*50}
   elseif opt.algo == 'RCNN' then
     feat_provider_test = nnf.RCNN(ds_test)
+    feat_dim = {3,feat_provider_test.crop_size,feat_provider_test.crop_size}
   else
     error(("Detection framework '%s' not available"):format(opt.algo))
   end
@@ -89,6 +95,7 @@ else
   batch_provider_test.fg_fraction = opt.fg_frac
   batch_provider_test.bg_threshold = {0.0,0.5}
   batch_provider_test.do_flip = false
+  batch_provider_test.batch_dim = feat_dim
   batch_provider_test:setupData()
   
   torch.save(testCache,batch_provider_test)
@@ -142,6 +149,10 @@ end
 --------------------------------------------------------------------------------
 -- Prepare training model
 --------------------------------------------------------------------------------
+
+if opt.algo == 'RCNN' then
+  classifier = model
+end
 
 trainer = nnf.Trainer(classifier,criterion)
 trainer.optimState.learningRate = opt.lr

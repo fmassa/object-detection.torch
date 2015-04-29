@@ -89,6 +89,7 @@ local function cleaningForward(input,model)
   local currentOutput = model.modules[1]:updateOutput(input)
   for i=2,#model.modules do
     collectgarbage()
+    collectgarbage()
     currentOutput = model.modules[i]:updateOutput(currentOutput)
     model.modules[i-1].output:resize()
     model.modules[i-1].gradInput:resize()
@@ -155,6 +156,7 @@ function SPP:getConv5(im_idx,flip)
       feats.rsp[i] = torch.FloatTensor(f:size()):copy(f)
     end
     
+    collectgarbage()
     collectgarbage()
     
     feats.imSize = torch.FloatTensor(I:size():totable())
