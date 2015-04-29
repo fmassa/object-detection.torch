@@ -17,7 +17,7 @@ local function createModel(nOutput)
   local ks = 7
   
   features:add(spatialconv(fS[1],fS[2],ks,ks,stride,stride,padding,padding))
-  features:add(nn.ReLU())
+  features:add(nn.ReLU(true))
   features:add(inn.LocalResponseNormalization(3,0.00005,0.75))
   features:add(maxpooling(3,3,2,2))
   
@@ -25,7 +25,7 @@ local function createModel(nOutput)
   padding = 0
   ks = 5
   features:add(spatialconv(fS[2],fS[3],ks,ks,stride,stride,padding,padding))
-  features:add(nn.ReLU())
+  features:add(nn.ReLU(true))
   features:add(inn.LocalResponseNormalization(3,0.00005,0.75))
   features:add(maxpooling(3,3,2,2))
   
@@ -33,13 +33,13 @@ local function createModel(nOutput)
   padding = 1
   ks = 3
   features:add(spatialconv(fS[3],fS[4],ks,ks,stride,stride,padding,padding))
-  features:add(nn.ReLU())
+  features:add(nn.ReLU(true))
 
   features:add(spatialconv(fS[4],fS[5],ks,ks,stride,stride,padding,padding))
-  features:add(nn.ReLU())
+  features:add(nn.ReLU(true))
   
   features:add(spatialconv(fS[5],fS[6],ks,ks,stride,stride,padding,padding))
-  features:add(nn.ReLU())
+  features:add(nn.ReLU(true))
   
   local modelsdir = '/home/francisco/work/projects/cross_domain/models'
   local mat = matio.load(paths.concat(modelsdir,'Zeiler_conv5_weights.mat'))
@@ -63,11 +63,11 @@ local function createModel(nOutput)
   local fS = {12800,4096,4096,nOutput}
   
   classifier:add(nn.Linear(fS[1],fS[2]))
-  classifier:add(nn.ReLU())
+  classifier:add(nn.ReLU(true))
   classifier:add(nn.Dropout(0.5,true))
   
   classifier:add(nn.Linear(fS[2],fS[3]))
-  classifier:add(nn.ReLU())
+  classifier:add(nn.ReLU(true))
   classifier:add(nn.Dropout(0.5,true))
   
   classifier:add(nn.Linear(fS[3],fS[4]))

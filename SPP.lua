@@ -86,17 +86,17 @@ end
 
 
 local function cleaningForward(input,model)
-  local currentOutput = input
-  for i=1,#model.modules do
+  local currentOutput = model.modules[1]:updateOutput(input)
+  for i=2,#model.modules do
     collectgarbage()
     currentOutput = model.modules[i]:updateOutput(currentOutput)
-    model.modules[i].output:resize()
-    model.modules[i].gradInput:resize()
-    if model.modules[i].gradWeight then
-      model.modules[i].gradWeight:resize()
+    model.modules[i-1].output:resize()
+    model.modules[i-1].gradInput:resize()
+    if model.modules[i-1].gradWeight then
+      model.modules[i-1].gradWeight:resize()
     end
-    if model.modules[i].gradBias then
-      model.modules[i].gradBias:resize()
+    if model.modules[i-1].gradBias then
+      model.modules[i-1].gradBias:resize()
     end
   end
   model.output = currentOutput
@@ -149,8 +149,8 @@ function SPP:getConv5(im_idx,flip)
       local sc = rows > cols and scales[i] or math.ceil(scales[i]*cols/rows)
       local Ir = image.scale(I,sc,sr):type(mtype)
       
-      local f = self.model:forward(Ir)
-      --local f = cleaningForward(Ir,self.model)
+      --local f = self.model:forward(Ir)
+      local f = cleaningForward(Ir,self.model)
       
       feats.rsp[i] = torch.FloatTensor(f:size()):copy(f)
     end
