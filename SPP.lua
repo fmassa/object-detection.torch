@@ -69,7 +69,7 @@ function SPP:getCrop(im_idx,bbox,flip)
   local bestScale,bestBbox = self:getBestSPPScale(bbox,self.curr_im_feats.imSize,self.curr_im_feats.scales)
   local box_norm = self:getResposeBoxes(bestBbox)
 
-  local crop_feat = self:getCroppedFeat(self.curr_im_feats[bestScale],box_norm)
+  local crop_feat = self:getCroppedFeat(self.curr_im_feats.rsp[bestScale],box_norm)
   
   return crop_feat  
 end
@@ -126,6 +126,10 @@ function SPP:getConv5(im_idx,flip)
     feats = f:read('/'):all()
     f:close()
     feats.scales = feats.scales:totable()
+    for i=1,#feats.scales do
+      feats.rsp[i] = feats.rsp[tostring(i)]
+      feats.rsp[tostring(i)] = nil
+    end
   else
     local I = self.dataset:getImage(im_idx):float()
     I = prepareImage(I)
@@ -135,6 +139,7 @@ function SPP:getConv5(im_idx,flip)
     local rows = I:size(2)
     local cols = I:size(3)
     feats = {}
+    feats.rsp = {}
     local mtype = self.model.output:type()
     
     -- compute conv5 feature maps at different scales
@@ -147,7 +152,7 @@ function SPP:getConv5(im_idx,flip)
       local f = self.model:forward(Ir)
       --local f = cleaningForward(Ir,self.model)
       
-      feats[('scale_%.4d'):format(scales[i])] = torch.FloatTensor(f:size()):copy(f)
+      feats.rsp[i] = torch.FloatTensor(f:size()):copy(f)
     end
     
     collectgarbage()
@@ -165,8 +170,10 @@ function SPP:getConv5(im_idx,flip)
       for i,v in pairs(feats) do
         if i == 'imSize' or i == 'scales' then
           f:write('/'..i,v)          
-        else
-          f:write('/'..i,v,options)
+        elseif i == 'rsp' then
+          for l,k in pairs(v) do
+            f:write('/rsp/'..l,k,options)
+          end
         end
       end
       
@@ -186,7 +193,7 @@ function SPP:getBestSPPScale(bbox,imSize,scales)
     num_scales = num_scales[1]
   end
   
-  local min_dim = imSize[2]<imSize[3] and imSize[2] or imSize[3]
+  local min_dim = math.min(imSize[2],imSize[3])
   
   local sz_conv_standard = self.sz_conv_standard
   local step_standard = self.step_standard
