@@ -92,8 +92,34 @@ local function createModel(nOutput)
   return features,classifier,model
 end
 
+local function loadModel(nOutput)
+  local model_base = torch.load('data/models/zeiler.t7'):double()
+  local features = nn.Sequential()
+  local classifier = nn.Sequential()
+  
+  for i=1,model_base:get(1):size() do
+    features:add(model_base:get(1):get(i))
+  end
+  
+  local nOutput = nOutput or 21
+  local last_el = nOutput == 1000 and 0 or 1
+  for i=1,model_base:get(3):size()-last_el do
+    classifier:add(model_base:get(3):get(i))
+  end
+  if last_el == 1 then
+    classifier:add(nn.Linear(4096,nOutput))
+  end
+  
+  local model = nn.Sequential()
+  model:add(features)
+  model:add(inn.SpatialPyramidPooling({{1,1},{2,2},{3,3},{6,6}}))
+  model:add(classifier)
+  
+  return features,classifier,model
+end
+
 -- 1.1. Create Network
-features, classifier, model = createModel()
+features, classifier, model = loadModel()
 
 -- 2. Create Criterion
 criterion = nn.CrossEntropyCriterion()
