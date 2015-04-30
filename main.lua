@@ -6,7 +6,6 @@ local opts = paths.dofile('opts.lua')
 opt = opts.parse(arg)
 print(opt)
 
-
 if opt.seed ~= 0 then
   torch.manualSeed(opt.seed)
   cutorch.manualSeed(opt.seed)
@@ -38,13 +37,14 @@ if paths.filep(trainCache) then
   batch_provider = torch.load(trainCache)
   feat_provider = batch_provider.feat_provider
   ds_train = feat_provider.dataset
+  feat_provider.model = features
 else
   ds_train = nnf.DataSetPascal{image_set='trainval',classes=classes,year=opt.year,
                          datadir=opt.datadir,roidbdir=opt.roidbdir}
   
   local feat_dim
   if opt.algo == 'SPP' then
-    feat_provider = nnf.SPP(ds_train,features)--:float()
+    feat_provider = nnf.SPP(ds_train)-- remove features here to reduce cache size
     feat_provider.cachedir = paths.concat(opt.cache,'features',opt.netType)
     feat_dim = {256*50}
   elseif opt.algo == 'RCNN' then
@@ -65,6 +65,7 @@ else
   batch_provider:setupData()
   
   torch.save(trainCache,batch_provider)
+  feat_provider.model = features
 end
 
 if paths.filep(testCache) then
@@ -72,12 +73,13 @@ if paths.filep(testCache) then
   batch_provider_test = torch.load(testCache)
   feat_provider_test = batch_provider_test.feat_provider
   ds_test = feat_provider_test.dataset
+  feat_provider_test.model = features
 else
   ds_test = nnf.DataSetPascal{image_set='test',classes=classes,year=opt.year,
                               datadir=opt.datadir,roidbdir=opt.roidbdir}
   local feat_dim
   if opt.algo == 'SPP' then
-    feat_provider_test = nnf.SPP(ds_test,features)--:float()
+    feat_provider_test = nnf.SPP(ds_test)--:float()
     feat_provider_test.randomscale = false
     feat_provider_test.cachedir = paths.concat(opt.cache,'features',opt.netType)
     feat_dim = {256*50}
@@ -99,12 +101,13 @@ else
   batch_provider_test:setupData()
   
   torch.save(testCache,batch_provider_test)
+  feat_provider_test.model = features
 end
 
-features = nil
+--features = nil
 
-collectgarbage()
-collectgarbage()
+--collectgarbage()
+--collectgarbage()
 
 --------------------------------------------------------------------------------
 -- Compute conv5 feature cache (for SPP)
@@ -169,12 +172,11 @@ reduc_counter = 0
 
 inputs = torch.FloatTensor()
 targets = torch.IntTensor()
-
 for i=1,opt.num_iter do
 
   print('Iteration: '..i..'/'..opt.num_iter)
   batch_provider:getBatch(inputs,targets)
-  print('==> Training '..exp_name)
+  print('==> Training '..paths.basename(opt.save_base))
   trainer:train(inputs,targets)
   print('==> Training Error: '..trainer.fx[i])
   
@@ -222,9 +224,9 @@ for i=1,opt.num_iter do
       end
     end
   end
-  sanitize(model)
-  torch.save(paths.concat(opt.save, 'model_' .. epoch .. '.t7'), model)
-  torch.save(paths.concat(opt.save, 'optimState_' .. epoch .. '.t7'), optimState)
+  --sanitize(model)
+  --torch.save(paths.concat(opt.save, 'model_' .. epoch .. '.t7'), model)
+  --torch.save(paths.concat(opt.save, 'optimState_' .. epoch .. '.t7'), optimState)
 end
 
 ds_train.roidb = nil

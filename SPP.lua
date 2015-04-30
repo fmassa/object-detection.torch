@@ -22,7 +22,7 @@ function SPP:__init(dataset,model)
   
   self.use_cache = true
 
-  self.cachedir = nil-- = '/home/francisco/work/projects/pose_estimation/cachedir/conv5/Zeiler5/pascal/'
+  self.cachedir = nil
 end
 
 local function rgb2bgr(I)
