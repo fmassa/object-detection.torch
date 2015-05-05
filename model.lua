@@ -19,7 +19,7 @@ local function createModel(nOutput)
   features:add(spatialconv(fS[1],fS[2],ks,ks,stride,stride,padding,padding))
   features:add(nn.ReLU(true))
   features:add(inn.LocalResponseNormalization(3,0.00005,0.75))
-  features:add(maxpooling(3,3,2,2))
+  features:add(maxpooling(3,3,2,2):ceil())
   
   stride = 2
   padding = 0
@@ -27,7 +27,7 @@ local function createModel(nOutput)
   features:add(spatialconv(fS[2],fS[3],ks,ks,stride,stride,padding,padding))
   features:add(nn.ReLU(true))
   features:add(inn.LocalResponseNormalization(3,0.00005,0.75))
-  features:add(maxpooling(3,3,2,2))
+  features:add(maxpooling(3,3,2,2):ceil())
   
   stride = 1
   padding = 1
@@ -119,7 +119,7 @@ local function loadModel(nOutput)
 end
 
 -- 1.1. Create Network
-features, classifier, model = loadModel()
+features, classifier, model = createModel()--loadModel()
 
 -- 2. Create Criterion
 criterion = nn.CrossEntropyCriterion()

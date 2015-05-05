@@ -46,6 +46,7 @@ else
   if opt.algo == 'SPP' then
     feat_provider = nnf.SPP(ds_train)-- remove features here to reduce cache size
     feat_provider.cachedir = paths.concat(opt.cache,'features',opt.netType)
+    feat_provider.scales = {600}
     feat_dim = {256*50}
   elseif opt.algo == 'RCNN' then
     feat_provider = nnf.RCNN(ds_train)
@@ -79,9 +80,10 @@ else
                               datadir=opt.datadir,roidbdir=opt.roidbdir}
   local feat_dim
   if opt.algo == 'SPP' then
-    feat_provider_test = nnf.SPP(ds_test)--:float()
+    feat_provider_test = nnf.SPP(ds_test)
     feat_provider_test.randomscale = false
     feat_provider_test.cachedir = paths.concat(opt.cache,'features',opt.netType)
+    feat_provider_test.scales = {600}
     feat_dim = {256*50}
   elseif opt.algo == 'RCNN' then
     feat_provider_test = nnf.RCNN(ds_test)
@@ -160,6 +162,13 @@ end
 trainer = nnf.Trainer(classifier,criterion)
 trainer.optimState.learningRate = opt.lr
 
+local conf_classes = {}
+table.insert(conf_classes,'background')
+for i=1,#classes do
+  table.insert(conf_classes,classes[i])
+end
+trainer.confusion = optim.ConfusionMatrix(conf_classes)
+
 validator = nnf.Tester(classifier,feat_provider_test)
 validator.cachefolder = opt.save_base
 validator.cachename = 'validation_data.t7'
@@ -175,16 +184,19 @@ targets = torch.IntTensor()
 for i=1,opt.num_iter do
 
   print('Iteration: '..i..'/'..opt.num_iter)
-  batch_provider:getBatch(inputs,targets)
+  inputs,targets = batch_provider:getBatch(inputs,targets)
   print('==> Training '..paths.basename(opt.save_base))
   trainer:train(inputs,targets)
   print('==> Training Error: '..trainer.fx[i])
+  print(trainer.confusion)
   
   err = validator:validate(criterion)
   print('==> Validation Error: '..err)
   table.insert(val_err,err)
 
-  logger:add{['train error (iters per batch='..batch_provider.iter_per_batch..')']=trainer.fx[i],['val error']=err,['learning rate']=trainer.optimState.learningRate}
+  logger:add{['train error (iters per batch='..batch_provider.iter_per_batch..
+              ')']=trainer.fx[i],['val error']=err,
+              ['learning rate']=trainer.optimState.learningRate}
 
   val_counter = val_counter + 1
 
@@ -194,7 +206,7 @@ for i=1,opt.num_iter do
     print('Reducing learning rate')
     trainer.optimState.learningRate = trainer.optimState.learningRate/2
     if opt.nildfdx == true then
-      trainer.optimState.dfdx= nil -- check if it hurts or not
+      trainer.optimState.dfdx= nil
     end
     val_counter = 0
     val_err = {}

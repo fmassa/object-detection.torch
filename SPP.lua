@@ -150,8 +150,8 @@ function SPP:getConv5(im_idx,flip)
       local sc = rows > cols and scales[i] or math.ceil(scales[i]*cols/rows)
       local Ir = image.scale(I,sc,sr):type(mtype)
       
-      --local f = self.model:forward(Ir)
-      local f = cleaningForward(Ir,self.model)
+      local f = self.model:forward(Ir)
+      --local f = cleaningForward(Ir,self.model)
       
       feats.rsp[i] = torch.FloatTensor(f:size()):copy(f)
     end

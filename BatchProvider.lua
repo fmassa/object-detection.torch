@@ -244,9 +244,9 @@ function BatchProvider:getBatch(batches,targets)
   
   local fg_windows,bg_windows,opts = self:permuteIdx()
   local fg_w,bg_w = self:selectBBoxes(fg_windows,bg_windows)
-    
-  --local batches = torch.FloatTensor(self.iter_per_batch,self.batch_size,unpack(self.batch_dim))
-  --local targets = torch.IntTensor(self.iter_per_batch,self.batch_size,self.target_dim)
+  
+  local batches = batches or torch.FloatTensor()
+  local targets = targets or torch.IntTensor()
   
   batches:resize(self.iter_per_batch,self.batch_size,unpack(self.batch_dim))
   targets:resize(self.iter_per_batch,self.batch_size,self.target_dim)
@@ -299,11 +299,7 @@ function BatchProvider:getBatch(batches,targets)
       targets[b][s] = fg_label[j]
     end
     
-    if i%50==0 then
-      collectgarbage() -- no need anymore ?
-    end
-    
   end
 
---  return batches,targets
+  return batches,targets
 end
