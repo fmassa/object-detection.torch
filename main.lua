@@ -155,6 +155,25 @@ end
 -- Prepare training model
 --------------------------------------------------------------------------------
 
+-- borrowed from https://github.com/soumith/imagenet-multiGPU.torch/blob/master/train.lua
+-- clear the intermediate states in the model before saving to disk
+-- this saves lots of disk space
+local function sanitize(net)
+  local list = net:listModules()
+  for _,val in ipairs(list) do
+    for name,field in pairs(val) do
+      if torch.type(field) == 'cdata' then val[name] = nil end
+      if name == 'homeGradBuffers' then val[name] = nil end
+      if name == 'input_gpu' then val['input_gpu'] = {} end
+      if name == 'gradOutput_gpu' then val['gradOutput_gpu'] = {} end
+      if name == 'gradInput_gpu' then val['gradInput_gpu'] = {} end
+      if (name == 'output' or name == 'gradInput') then
+        val[name] = field.new()
+      end
+    end
+  end
+end
+
 if opt.algo == 'RCNN' then
   classifier = model
 end
@@ -218,28 +237,13 @@ for i=1,opt.num_iter do
   end
 
   collectgarbage()
-  -- borrowed from https://github.com/soumith/imagenet-multiGPU.torch/blob/master/train.lua
-  -- clear the intermediate states in the model before saving to disk
-  -- this saves lots of disk space
-  local function sanitize(net)
-    local list = net:listModules()
-    for _,val in ipairs(list) do
-      for name,field in pairs(val) do
-        if torch.type(field) == 'cdata' then val[name] = nil end
-        if name == 'homeGradBuffers' then val[name] = nil end
-        if name == 'input_gpu' then val['input_gpu'] = {} end
-        if name == 'gradOutput_gpu' then val['gradOutput_gpu'] = {} end
-        if name == 'gradInput_gpu' then val['gradInput_gpu'] = {} end
-        if (name == 'output' or name == 'gradInput') then
-          val[name] = field.new()
-        end
-      end
-    end
-  end
   --sanitize(model)
-  --torch.save(paths.concat(opt.save, 'model_' .. epoch .. '.t7'), model)
-  --torch.save(paths.concat(opt.save, 'optimState_' .. epoch .. '.t7'), optimState)
+  --torch.save(paths.concat(opt.save, 'model_' .. epoch .. '.t7'), classifier)
+  --torch.save(paths.concat(opt.save, 'optimState_' .. epoch .. '.t7'), trainer.optimState)
 end
+
+sanitize(classifier)
+torch.save(paths.concat(opt.save, 'model.t7'), classifier)
 
 ds_train.roidb = nil
 collectgarbage()

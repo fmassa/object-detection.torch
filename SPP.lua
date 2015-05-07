@@ -76,11 +76,11 @@ end
 
 function SPP:getFeature(im_idx,bbox,flip)
   local flip = flip or false
-  
+
   local crop_feat = self:getCrop(im_idx,bbox,flip)
-  
+
   local feat = self.spp_pooler:forward(crop_feat)
-  
+
   return feat
 end
 
