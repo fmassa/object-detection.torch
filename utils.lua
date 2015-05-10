@@ -196,11 +196,48 @@ local function VOCevaldet(dataset,scored_boxes,cls)
 end
 
 
+--------------------------------------------------------------------------------
+-- data preparation
+--------------------------------------------------------------------------------
+
+local function rgb2bgr(I)
+  local out = I.new():resizeAs(I)
+  for i=1,I:size(1) do
+    out[i] = I[I:size(1)+1-i]
+  end
+  return out
+end
+
+local function prepareImage(I,typ)
+  local typ = typ or 1
+  local mean_pix = typ == 1 and {128.,128.,128.} or {103.939, 116.779, 123.68}
+  local I = I
+  if I:dim() == 2 then
+    I = I:view(1,I:size(1),I:size(2))
+  end
+  if I:size(1) == 1 then
+    I = I:expand(3,I:size(2),I:size(3))
+  end
+  I = rgb2bgr(I):mul(255)
+  for i=1,3 do
+    I[i]:add(-mean_pix[i])
+  end
+  return I
+end
+
+
+
+--------------------------------------------------------------------------------
+-- packaging
+--------------------------------------------------------------------------------
+
 local utils = {}
 
 utils.keep_top_k = keep_top_k
 utils.VOCevaldet = VOCevaldet
 utils.VOCap = VOCap
+utils.prepareImage = prepareImage
 
 return utils
+
 
