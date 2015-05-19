@@ -195,8 +195,7 @@ function SPP:getBestSPPScale(bbox,imSize,scales)
       nbboxDiffArea[i] = math.abs(scales[i]-expected_scale)
     end
   
-    _,bestScale = nbboxDiffArea:min(1)
-    bestScale = bestScale[1]
+    bestScale = select(2,nbboxDiffArea:min(1))[1] -- index of minimum area
   
   end
 
