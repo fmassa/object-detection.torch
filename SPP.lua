@@ -5,11 +5,12 @@ local prepareImage = utils.prepareImage
 local SPP = torch.class('nnf.SPP')
 
 --TODO vectorize code ?
-function SPP:__init(dataset,model)
+function SPP:__init(dataset,model,...)
 
   self.dataset = dataset
   self.model = model
   self.spp_pooler = inn.SpatialPyramidPooling({{1,1},{2,2},{3,3},{6,6}}):float()
+  self.image_transformer = nnf.ImageTransformer()
 
 -- paper=864, their code=874 
   self.scales = {480,576,688,874,1200} -- 874
@@ -25,6 +26,9 @@ function SPP:__init(dataset,model)
   self.use_cache = true
 
   self.cachedir = nil
+  
+  local args = ...
+  for k,v in pairs(args) do self.k = v end
 end
 
 
@@ -111,7 +115,8 @@ function SPP:getConv5(im_idx,flip)
     end
   else
     local I = self.dataset:getImage(im_idx):float()
-    I = prepareImage(I)
+    --I = prepareImage(I)
+    I = self.image_transformer:preprocess(I)
     if flip then
       I = image.hflip(I)
     end

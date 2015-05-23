@@ -3,13 +3,18 @@ local prepareImage = utils.prepareImage
 
 local RCNN = torch.class('nnf.RCNN')
 
-function RCNN:__init(dataset)
+function RCNN:__init(dataset,...)
   self.dataset = dataset
+  self.image_transformer = nnf.ImageTransformer{
+                                  mean_pix={123.68/255,116.779/255,103.939/255}}
   
   self.crop_size = 227
   self.image_mean = nil
   self.padding = 16
   self.use_square = false
+  
+  local args = ...
+  for k,v in pairs(args) do self.k = v end
 end
 
 function RCNN:getCrop(im_idx,bbox,flip)
@@ -20,7 +25,7 @@ function RCNN:getCrop(im_idx,bbox,flip)
   if self.curr_im_idx ~= im_idx or self.curr_doflip ~= flip then
     self.curr_im_idx = im_idx
     self.curr_im_feats = self.dataset:getImage(im_idx):float()
-    self.curr_im_feats = prepareImage(self.curr_im_feats,2)
+    self.curr_im_feats = self.image_transformer:preprocess(self.curr_im_feats)
     if flip then
       self.curr_im_feats = image.hflip(self.curr_im_feats)
     end
