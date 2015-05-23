@@ -200,32 +200,60 @@ end
 -- data preparation
 --------------------------------------------------------------------------------
 
-local function rgb2bgr(I)
-  local out = I.new():resizeAs(I)
-  for i=1,I:size(1) do
-    out[i] = I[I:size(1)+1-i]
+-- Caffe models are in BGR format, and they suppose the images range from 0-255.
+-- This function modifies the model read by loadcaffe to use it in torch format
+-- location is the postion of the first conv layer in the module. If you have
+-- nested models (like sequential inside sequential), location should be a
+-- table with as many elements as the depth of the network.
+local function convertCaffeModelToTorch(model,location)
+  local location = location or {1}
+  local m = model
+  for i=1,#location do
+    m = m:get(location[i])
   end
-  return out
-end
-
-local function prepareImage(I,typ)
-  local typ = typ or 1
-  local mean_pix = typ == 1 and {128.,128.,128.} or {103.939, 116.779, 123.68}
-  local I = I
-  if I:dim() == 2 then
-    I = I:view(1,I:size(1),I:size(2))
+  local weight = m.weight
+  local weight_clone = weight:clone()
+  local nchannels = weight:size(2)
+  for i=1,nchannels do
+    weight:select(2,i):copy(weight_clone:select(2,nchannels+1-i))
   end
-  if I:size(1) == 1 then
-    I = I:expand(3,I:size(2),I:size(3))
-  end
-  I = rgb2bgr(I):mul(255)
-  for i=1,3 do
-    I[i]:add(-mean_pix[i])
-  end
-  return I
+  weight:mul(255)
 end
 
 
+--------------------------------------------------------------------------------
+-- nn
+--------------------------------------------------------------------------------
+
+local function reshapeLastLinearLayer(model,nOutput)
+  local layers = model:findModules('nn.Linear')
+  local layer = layers[#layers]
+  local nInput = layer.weight:size(2)
+  layer.gradBias:resize(nOutput):zero()
+  layer.gradWeight:resize(nOutput,nInput):zero()
+  layer.bias:resize(nOutput)
+  layer.weight:resize(nOutput,nInput)
+  layer:reset()
+end
+
+-- borrowed from https://github.com/soumith/imagenet-multiGPU.torch/blob/master/train.lua
+-- clear the intermediate states in the model before saving to disk
+-- this saves lots of disk space
+local function sanitize(net)
+  local list = net:listModules()
+  for _,val in ipairs(list) do
+    for name,field in pairs(val) do
+      if torch.type(field) == 'cdata' then val[name] = nil end
+      if name == 'homeGradBuffers' then val[name] = nil end
+      if name == 'input_gpu' then val['input_gpu'] = {} end
+      if name == 'gradOutput_gpu' then val['gradOutput_gpu'] = {} end
+      if name == 'gradInput_gpu' then val['gradInput_gpu'] = {} end
+      if (name == 'output' or name == 'gradInput') then
+        val[name] = field.new()
+      end
+    end
+  end
+end
 
 --------------------------------------------------------------------------------
 -- packaging
@@ -236,7 +264,9 @@ local utils = {}
 utils.keep_top_k = keep_top_k
 utils.VOCevaldet = VOCevaldet
 utils.VOCap = VOCap
-utils.prepareImage = prepareImage
+utils.convertCaffeModelToTorch = convertCaffeModelToTorch
+utils.reshapeLastLinearLayer = reshapeLastLinearLayer
+utils.sanitize = sanitize
 
 return utils
 

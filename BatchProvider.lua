@@ -261,12 +261,11 @@ function BatchProvider:getBatch(batches,targets)
   bg_data  = torch.FloatTensor()
   fg_label = torch.IntTensor()
   bg_label = torch.IntTensor()
-  
+
   print('==> Preparing Batch Data')
   for i=1,opts.img_idx_end do
-    
     xlua.progress(i,opts.img_idx_end)
-    
+
     local curr_idx = opts.img_idx[i]
     
     local nfg = fg_w[curr_idx] and #fg_w[curr_idx] or 0
@@ -286,8 +285,8 @@ function BatchProvider:getBatch(batches,targets)
       local idx = bg_rnd_idx[bg_counter]
       local b = math.ceil(idx/self.bg_num_each)
       local s = (idx-1)%self.bg_num_each + 1
-      batches[b][s] = bg_data[j]
-      targets[b][s] = bg_label[j]
+      batches[b][s]:copy(bg_data[j])
+      targets[b][s]:copy(bg_label[j])
     end
 
     for j=1,nfg do
@@ -295,11 +294,9 @@ function BatchProvider:getBatch(batches,targets)
       local idx = fg_rnd_idx[fg_counter]
       local b = math.ceil(idx/self.fg_num_each)
       local s = (idx-1)%self.fg_num_each + 1 + self.bg_num_each 
-      batches[b][s] = fg_data[j]
-      targets[b][s] = fg_label[j]
+      batches[b][s]:copy(fg_data[j])
+      targets[b][s]:copy(fg_label[j])
     end
-    
   end
-
   return batches,targets
 end

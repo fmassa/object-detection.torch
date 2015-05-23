@@ -1,6 +1,3 @@
-local utils = paths.dofile('utils.lua')
-local prepareImage = utils.prepareImage
-
 local RCNN = torch.class('nnf.RCNN')
 
 function RCNN:__init(dataset,...)

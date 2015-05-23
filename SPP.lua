@@ -1,6 +1,4 @@
 local hdf5 = require 'hdf5'
-local utils = paths.dofile('utils.lua')
-local prepareImage = utils.prepareImage
 
 local SPP = torch.class('nnf.SPP')
 
@@ -115,7 +113,6 @@ function SPP:getConv5(im_idx,flip)
     end
   else
     local I = self.dataset:getImage(im_idx):float()
-    --I = prepareImage(I)
     I = self.image_transformer:preprocess(I)
     if flip then
       I = image.hflip(I)
