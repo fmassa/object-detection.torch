@@ -10,7 +10,7 @@ local function lines_from(file)
 -- get all lines from a file, returns an empty 
 -- list/table if the file does not exist
   if not paths.filep(file) then return {} end
-  lines = {}
+  local lines = {}
   for line in io.lines(file) do 
     table.insert(lines,line)
   end
