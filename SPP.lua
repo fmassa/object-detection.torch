@@ -8,7 +8,7 @@ function SPP:__init(dataset,model,...)
   self.dataset = dataset
   self.model = model
   self.spp_pooler = inn.SpatialPyramidPooling({{1,1},{2,2},{3,3},{6,6}}):float()
-  self.image_transformer = nnf.ImageTransformer()
+  self.image_transformer = nnf.ImageTransformer{}
 
 -- paper=864, their code=874 
   self.scales = {480,576,688,874,1200} -- 874
