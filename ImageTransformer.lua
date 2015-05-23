@@ -5,7 +5,7 @@ function ImageTransformer:__init(...)
   self.raw_scale = 1
   self.swap = nil 
   local args = ...
-  for k,v in pairs(args) do self.k = v end
+  for k,v in pairs(args) do self[k] = v end
 end
 
 local function channel_swap(I,swap)

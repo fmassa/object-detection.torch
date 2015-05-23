@@ -11,7 +11,7 @@ function RCNN:__init(dataset,...)
   self.use_square = false
   
   local args = ...
-  for k,v in pairs(args) do self.k = v end
+  for k,v in pairs(args) do self[k] = v end
 end
 
 function RCNN:getCrop(im_idx,bbox,flip)

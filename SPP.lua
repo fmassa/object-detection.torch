@@ -26,7 +26,7 @@ function SPP:__init(dataset,model,...)
   self.cachedir = nil
   
   local args = ...
-  for k,v in pairs(args) do self.k = v end
+  for k,v in pairs(args) do self[k] = v end
 end
 
 
