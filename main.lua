@@ -101,7 +101,7 @@ for i=1,opt.num_iter do
   --torch.save(paths.concat(opt.save, 'optimState_' .. epoch .. '.t7'), trainer.optimState)
 end
 
-sanitize(classifier)
+--sanitize(classifier)
 torch.save(paths.concat(opt.save, 'model.t7'), classifier)
 
 ds_train.roidb = nil

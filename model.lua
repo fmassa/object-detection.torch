@@ -1,7 +1,6 @@
 require 'nn'
 require 'inn'
 require 'cudnn'
-local matio = require 'matio'
 local reshapeLastLinearLayer = paths.dofile('utils.lua').reshapeLastLinearLayer
 
 -- 1.1. Create Network

@@ -202,10 +202,12 @@ end
 
 function DataSetPascal:__tostring__()
   local str = torch.type(self)
-  if self:size() > 0 then
-    str = str .. ': num samples: '.. self:size()
-  else
-    str = str .. ': empty'
+  str = str .. '\n  Dataset Name: ' .. self.dataset_name
+  str = str .. '\n  ImageSet: '.. self.image_set
+  str = str .. '\n  Number of images: '.. self:size()
+  str = str .. '\n  Classes:'
+  for k,v in ipairs(self.classes) do
+    str = str .. '\n    '..v
   end
   return str
 end
@@ -238,7 +240,7 @@ function DataSetPascal:loadROIDB()
   
 end
 
-function DataSetPascal:getROIDB(i)
+function DataSetPascal:getROIBoxes(i)
   if not self.roidb then
     self:loadROIDB()
   end
@@ -273,45 +275,51 @@ local function boxoverlap(a,b)
   return o
 end
 
+function DataSetPascal:getGTBoxes(i)
+  local anno = self:getAnnotation(i)
+  local valid_objects = {}
+  local gt_boxes = torch.IntTensor()
+  local gt_classes = {}
+
+  if self.with_hard_samples then -- inversed with respect to RCNN code
+    for idx,obj in ipairs(anno.object) do
+      if self.class_to_id[obj.name] then -- to allow a subset of the classes
+        table.insert(valid_objects,idx)
+      end
+    end
+  else
+    for idx,obj in ipairs(anno.object) do
+      if obj.difficult == '0' and self.class_to_id[obj.name] then
+        table.insert(valid_objects,idx)
+      end
+    end
+  end
+  
+  gt_boxes:resize(#valid_objects,4)
+  for idx0,idx in ipairs(valid_objects) do
+    gt_boxes[idx0][1] = anno.object[idx].bndbox.xmin
+    gt_boxes[idx0][2] = anno.object[idx].bndbox.ymin
+    gt_boxes[idx0][3] = anno.object[idx].bndbox.xmax
+    gt_boxes[idx0][4] = anno.object[idx].bndbox.ymax
+    
+    table.insert(gt_classes,self.class_to_id[anno.object[idx].name])
+  end
+
+  return gt_boxes,gt_classes,valid_objects,anno
+ 
+end
+
 function DataSetPascal:attachProposals(i)
 
   if not self.roidb then
     self:loadROIDB()
   end
 
-  local anno = self:getAnnotation(i)
-  local boxes = self:getROIDB(i)
-  
-  local gt_boxes
-  local gt_classes = {}
-  local all_boxes
-  local valid_objects = {}
-  
-  if anno.object then
-    if self.with_hard_samples then -- inversed with respect to RCNN code
-      for idx,obj in ipairs(anno.object) do
-        if self.class_to_id[obj.name] then -- to allow a subset of the classes
-          table.insert(valid_objects,idx)
-        end
-      end
-    else
-      for idx,obj in ipairs(anno.object) do
-        if obj.difficult == '0' and self.class_to_id[obj.name] then
-          table.insert(valid_objects,idx)
-        end
-      end
-    end
-    
-    gt_boxes = torch.IntTensor(#valid_objects,4)
-    for idx0,idx in ipairs(valid_objects) do
-      gt_boxes[idx0][1] = anno.object[idx].bndbox.xmin
-      gt_boxes[idx0][2] = anno.object[idx].bndbox.ymin
-      gt_boxes[idx0][3] = anno.object[idx].bndbox.xmax
-      gt_boxes[idx0][4] = anno.object[idx].bndbox.ymax
-      
-      table.insert(gt_classes,self.class_to_id[anno.object[idx].name])
-    end
+  local boxes = self:getROIBoxes(i)
+  local gt_boxes,gt_classes,valid_objects,anno = self:getGTBoxes(i)
 
+  local all_boxes
+  if anno.object then
     if #valid_objects > 0 and boxes:dim() > 0 then
       all_boxes = torch.cat(gt_boxes,boxes,1)
     elseif boxes:dim() == 0 then
@@ -319,7 +327,6 @@ function DataSetPascal:attachProposals(i)
     else
       all_boxes = boxes
     end
-    
   else
     gt_boxes = torch.IntTensor(0,4)
     all_boxes = boxes

@@ -99,7 +99,7 @@ function Tester:test(iteration)
   for i=1,dataset:size() do
     timer:reset()
     io.write(('test: (%s) %5d/%-5d '):format(dataset.dataset_name,i,dataset:size()));
-    boxes = dataset:getROIDB(i):float()
+    boxes = dataset:getROIBoxes(i):float()
     local num_boxes = boxes:size(1)
     -- compute image feature maps
     timer3:reset()
