@@ -66,7 +66,9 @@ for i=1,opt.num_iter do
   trainer:train(inputs,targets)
   print('==> Training Error: '..trainer.fx[i])
   print(trainer.confusion)
-  
+
+  collectgarbage() 
+
   err = validator:validate(criterion)
   print('==> Validation Error: '..err)
   table.insert(val_err,err)
