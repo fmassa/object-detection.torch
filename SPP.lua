@@ -3,7 +3,7 @@ local hdf5 = require 'hdf5'
 local SPP = torch.class('nnf.SPP')
 
 --TODO vectorize code ?
-function SPP:__init(dataset,model,...)
+function SPP:__init(dataset,model)
 
   self.dataset = dataset
   self.model = model
@@ -25,8 +25,6 @@ function SPP:__init(dataset,model,...)
 
   self.cachedir = nil
   
-  local args = ...
-  for k,v in pairs(args) do self[k] = v end
 end
 
 

@@ -1,6 +1,6 @@
 local RCNN = torch.class('nnf.RCNN')
 
-function RCNN:__init(dataset,...)
+function RCNN:__init(dataset)
   self.dataset = dataset
   self.image_transformer = nnf.ImageTransformer{
                                   mean_pix={123.68/255,116.779/255,103.939/255}}
@@ -10,8 +10,6 @@ function RCNN:__init(dataset,...)
   self.padding = 16
   self.use_square = false
   
-  local args = ...
-  for k,v in pairs(args) do self[k] = v end
 end
 
 function RCNN:getCrop(im_idx,bbox,flip)
