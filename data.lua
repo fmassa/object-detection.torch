@@ -10,7 +10,7 @@ local pooler
 local feat_dim
 
 if opt.algo == 'SPP' then
-  local conv_list = features:findModules('cudnn.SpatialConvolution')
+  local conv_list = features:findModules(opt.backend..'.SpatialConvolution')
   local num_chns = conv_list[#conv_list].nOutputPlane
   pooler = model:get(2):clone():float()
   local pyr = torch.Tensor(pooler.pyr):t()
