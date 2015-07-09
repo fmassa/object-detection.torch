@@ -51,6 +51,7 @@ else
   batch_provider = nnf.BatchProvider(feat_provider)
   batch_provider.iter_per_batch = opt.ipb
   batch_provider.nTimesMoreData = opt.ntmd
+  batch_provider.batch_size = opt.batch_size
   batch_provider.fg_fraction = opt.fg_frac
   batch_provider.bg_threshold = {0.0,0.5}
   batch_provider.do_flip = true
@@ -89,6 +90,7 @@ else
   batch_provider_test = nnf.BatchProvider(feat_provider_test)
   batch_provider_test.iter_per_batch = 500--opt.ipb
   batch_provider_test.nTimesMoreData = 10--opt.ntmd
+  batch_provider_test.batch_size = opt.batch_size
   batch_provider_test.fg_fraction = opt.fg_frac
   batch_provider_test.bg_threshold = {0.0,0.5}
   batch_provider_test.do_flip = false
