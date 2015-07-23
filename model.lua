@@ -2,12 +2,16 @@ require 'nn'
 require 'inn'
 require 'cudnn'
 local reshapeLastLinearLayer = paths.dofile('utils.lua').reshapeLastLinearLayer
+local convertCaffeModelToTorch = paths.dofile('utils.lua').convertCaffeModelToTorch
 
 -- 1.1. Create Network
 local config = opt.netType
 local createModel = paths.dofile('models/' .. config .. '.lua')
 print('=> Creating model from file: models/' .. config .. '.lua')
 model = createModel(opt.backend)
+
+-- convert to accept inputs in the range 0-1 RGB format
+convertCaffeModelToTorch(model,{1,1})
 
 reshapeLastLinearLayer(model,#classes+1)
 image_mean = {128/255,128/255,128/255}
