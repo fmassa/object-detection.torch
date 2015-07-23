@@ -7,7 +7,7 @@ local function createModel(backend)
   local relu
   
   if backend == 'nn' then
-    maxpooling = inn.SpatialMaxPooling
+    maxpooling = nn.SpatialMaxPooling
     spatialconv = nn.SpatialConvolution
     relu = nn.ReLU
   elseif backend == 'cudnn' then
@@ -33,11 +33,7 @@ local function createModel(backend)
       features:add(inn.SpatialSameResponseNormalization(3,0.00005,0.75))
     end
     if pool[i] then
-      if backend == 'cudnn' then
-        features:add(maxpooling(3,3,2,2):ceil())
-      else
-        features:add(maxpooling(3,3,2,2))
-      end
+      features:add(maxpooling(3,3,2,2):ceil())
     end
   end
   
