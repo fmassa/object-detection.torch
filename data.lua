@@ -37,7 +37,7 @@ else
     feat_provider.cachedir = paths.concat(opt.cache,'features',opt.netType)
     feat_provider.randomscale = true
     feat_provider.scales = {600}
-    feat_provider.pooler = pooler:clone()
+    feat_provider.spp_pooler = pooler:clone()
     feat_provider.image_transformer = image_transformer
   elseif opt.algo == 'RCNN' then
     feat_provider = nnf.RCNN(ds_train)
@@ -76,7 +76,7 @@ else
     feat_provider_test.randomscale = false
     feat_provider_test.cachedir = paths.concat(opt.cache,'features',opt.netType)
     feat_provider_test.scales = {600}
-    feat_provider_test.pooler = pooler:clone()
+    feat_provider_test.spp_pooler = pooler:clone()
     feat_provider_test.image_transformer = image_transformer
   elseif opt.algo == 'RCNN' then
     feat_provider_test = nnf.RCNN(ds_test)
