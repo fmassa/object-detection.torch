@@ -32,6 +32,7 @@ function ROIDataLayer:getBatch()
   local num_images = img_ids:size(1)
   local imgs = {}
   local im_sizes = {}
+  local im_scales = {}
   -- get images
   -- prep_im_for_blob
   for i=1,num_images do
@@ -47,6 +48,7 @@ function ROIDataLayer:getBatch()
     local im_s = {im_size[1]*im_scale,im_size[2]*im_scale}
     table.insert(imgs,image.scale(im,im_s[2],im_s[1]))
     table.insert(im_sizes,im_s)
+    table.insert(im_scales,im_scale)
   end
   -- create single tensor with all images, padding with zero for different sizes
   im_sizes = torch.IntTensor(im_sizes)
@@ -56,7 +58,32 @@ function ROIDataLayer:getBatch()
     images[i][{{1,imgs[i]:size(2)},{imgs[i]:size(3)}}]:copy(imgs[i])
   end
 
+
   return images
 end
 
 
+local function sample_rois(self,i)
+
+  local dataset = self.dataset
+  local rec = dataset:attachProposals(i)
+  local fg_inds = {}
+  local bg_inds = {}
+  for j=1,rec:size() do    
+    local id = rec.label[j]
+    local is_fg = (rec.overlap[j] >= self.fg_threshold)
+    local is_bg = (rec.overlap[j] >= self.bg_threshold[1]  and
+                   rec.overlap[j] <  self.bg_threshold[2])
+    if is_fg then
+      table.insert(fg_inds,j)
+    elseif is_bg then
+      table.insert(bg_inds,j)
+    end
+  end
+  
+  local fg_rois_per_this_image = math.min(#fg_inds,self.fg_)
+  if #fg_inds > 0 then
+    
+  end
+
+end
