@@ -8,13 +8,25 @@ function ROIPooling:__init(W,H)
   self.spatial_scale = 1
 end
 
+function ROIPooling:setSpatialScale(scale)
+  self.spatial_scale = scale
+  return self
+end
+
 function ROIPooling:updateOutput(input)
   local data = input[1]
   local rois = input[2]
+
   local num_rois = rois:size(1)
   local s = data:size()
   local ss = s:size(1)
   self.output:resize(num_rois,s[ss-2],self.H,self.W)
+
+  rois[{{},{2,5}}]:add(-1):mul(self.spatial_scale):add(1):round()
+  rois[{{},2}]:cmin(s[ss])
+  rois[{{},3}]:cmin(s[ss-1])
+  rois[{{},4}]:cmin(s[ss])
+  rois[{{},5}]:cmin(s[ss-1])
 
   if not self._type then self._type = output:type() end
 
