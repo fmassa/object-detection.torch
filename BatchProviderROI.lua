@@ -138,12 +138,12 @@ function BatchProviderROI:getBatch(batches,targets)
   --local fg_w,bg_w = self:selectBBoxes(fg_windows,bg_windows)
   
   local batches = batches or {torch.FloatTensor(),torch.FloatTensor()}
-  local targets = targets or torch.IntTensor()
+  local targets = targets or torch.FloatTensor()
   
   local im_scales = getImages(self,opts.img_idx,batches[1])
   local rois,labels = self:selectBBoxes(fg_windows,bg_windows,im_scales)
   batches[2]:resizeAs(rois):copy(rois)
-  targets:resizeAs(labels):copy(labels)
+  targets:resize(labels:size()):copy(labels)
   
   return batches, targets
 end
