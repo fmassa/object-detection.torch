@@ -21,6 +21,17 @@ if opt.algo == 'RCNN' then
 elseif opt.algo == 'SPP' then
   features = model:get(1)
   classifier = model:get(3)
+elseif opt.algo == 'FRCNN' then
+  local temp = nn.Sequential()
+  local features = model:get(1)
+  local classifier = model:get(3)
+  local prl = nn.ParallelTable()
+  prl:add(features)
+  prl:add(nn.Identity())
+  temp:add(prl)
+  temp:add(nnf.ROIPooling(7,7))
+  temp:add(nn.View(-1):setNumInputDims(3))
+  temp:add(classifier)
 end
 
 -- 2. Create Criterion

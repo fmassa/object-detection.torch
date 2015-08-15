@@ -11,6 +11,7 @@ torch.include('nnf','BatchProviderROI.lua')
 
 --torch.include('nnf','SPP.lua')
 torch.include('nnf','RCNN.lua')
+torch.include('nnf','ROIPooling.lua')
 
 torch.include('nnf','Trainer.lua')
 torch.include('nnf','Tester.lua')

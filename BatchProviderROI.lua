@@ -30,7 +30,7 @@ function BatchProviderROI:permuteIdx()
   self._cur = self._cur + self.imgs_per_batch
 
   local img_idx_end  = imgs_per_batch
- --[[ 
+
   local fg_windows = {}
   local bg_windows = {}
   for i=1,img_idx_end do
@@ -48,40 +48,50 @@ function BatchProviderROI:permuteIdx()
       end
     end
   end
-  --]]
+  
   local opts = {img_idx=img_idx,img_idx_end=img_idx_end}
   return fg_windows,bg_windows,opts
 
 end
 
-function BatchProviderROI:selectBBoxes(fg_windows,bg_windows)
-  local fg_w = {}
-  local bg_w = {}
+function BatchProviderROI:selectBBoxes(fg_windows,bg_windows,im_scales)
+  --local fg_w = {}
+  --local bg_w = {}
 
+  local rois = {}
+  local labels = {}
   for im=1,self.imgs_per_batch do
 
-    fg_w[im] = {}
-    bg_w[im] = {}
+    local im_scale = im_scales[im]
+    --fg_w[im] = {}
+    --bg_w[im] = {}
 
     local window_idx = torch.randperm(#bg_windows[im])
     for i=1,math.min(self.bg_num_each,#bg_windows[im]) do
       local curr_idx = bg_windows[im][window_idx[i] ][1]
       local position = bg_windows[im][window_idx[i] ][2]
-      local dd = self.bboxes[curr_idx][0][position]
-      table.insert(bg_w[im],dd)
+      local dd = self.bboxes[curr_idx][0][position][{{2,5}}]--:totable()
+      dd:add(-1):mul(im_scale):add(1)
+      --table.insert(bg_w[im],dd)
+      table.insert(rois,{im,dd[1],dd[2],dd[3],dd[4]})
+      table.insert(labels,self.bboxes[curr_idx][0][position][6])
     end
 
     window_idx = torch.randperm(#fg_windows[im])
     for i=1,math.min(self.fg_num_each,#fg_windows[im]) do
       local curr_idx = fg_windows[im][window_idx[i] ][1]
       local position = fg_windows[im][window_idx[i] ][2]
-      local dd = self.bboxes[curr_idx][1][position]
-      table.insert(fg_w[im],dd)
+      local dd = self.bboxes[curr_idx][1][position][{{2,5}}]--:totable()
+      dd:add(-1):mul(im_scale):add(1)
+      --table.insert(fg_w[im],dd)
+      table.insert(rois,{im,dd[1],dd[2],dd[3],dd[4]})
+      table.insert(labels,self.bboxes[curr_idx][1][position][6])
     end
-  
   end
-
-  return fg_w,bg_w
+  rois = torch.FloatTensor(rois)
+  labels = torch.IntTensor(labels)
+  --return fg_w,bg_w
+  return rois, labels
 end
 
 local function getImages(self,img_ids,images)
@@ -123,8 +133,6 @@ function BatchProviderROI:getBatch(batches,targets)
   
   self.fg_num_each = self.fg_fraction * self.batch_size
   self.bg_num_each = self.batch_size - self.fg_num_each
-  --self.fg_num_total = self.fg_num_each * self.iter_per_batch
-  --self.bg_num_total = self.bg_num_each * self.iter_per_batch
   
   local fg_windows,bg_windows,opts = self:permuteIdx()
   --local fg_w,bg_w = self:selectBBoxes(fg_windows,bg_windows)
@@ -132,10 +140,10 @@ function BatchProviderROI:getBatch(batches,targets)
   local batches = batches or {torch.FloatTensor(),torch.FloatTensor()}
   local targets = targets or torch.IntTensor()
   
- -- batches[1]:resize(self.batch_size,unpack(self.batch_dim))
   local im_scales = getImages(self,opts.img_idx,batches[1])
-  batches[2]:resize(self.batch_size,unpack(self.batch_dim))
-  targets:resize(self.batch_size,self.target_dim)
+  local rois,labels = self:selectBBoxes(fg_windows,bg_windows,im_scales)
+  batches[2]:resizeAs(rois):copy(rois)
+  targets:resizeAs(labels):copy(labels)
   
   return batches, targets
 end
