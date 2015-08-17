@@ -6,6 +6,7 @@ function ROIPooling:__init(W,H)
   self.H = H
   self.pooler = {}--nn.SpatialAdaptiveMaxPooling(W,H)
   self.spatial_scale = 1
+  self.gradInput = {torch.Tensor()}
 end
 
 function ROIPooling:setSpatialScale(scale)
@@ -41,7 +42,7 @@ function ROIPooling:updateOutput(input)
     local roi = rois[i]
     local im_idx = roi[1]
     local im = data[{im_idx,{},{roi[3],roi[5]},{roi[2],roi[4]}}]
-    self.output[i] = self.pooler[i]:forward(im)
+    self.output[i] = self.pooler[i]:updateOutput(im)
   end
   return self.output
 end
@@ -52,18 +53,17 @@ function ROIPooling:updateGradInput(input,gradOutput)
   local num_rois = rois:size(1)
   local s = data:size()
   local ss = s:size(1)
-  self.gradInput:resizeAs(data):zero()
+  self.gradInput[1]:resizeAs(data):zero()
 
   for i=1,num_rois do
     local roi = rois[i]
     local im_idx = roi[1]
     local r = {im_idx,{},{roi[3],roi[5]},{roi[2],roi[4]}}
     local im = data[r]
-    local g  = self.pooler[i]:backward(im,gradOutput[i])
-    self.gradInput[r]:add(g)
+    local g  = self.pooler[i]:updateGradInput(im,gradOutput[i])
+    self.gradInput[1][r]:add(g)
   end
   return self.gradInput
-
 end
 
 function ROIPooling:type(type)

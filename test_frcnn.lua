@@ -15,8 +15,14 @@ else
   ds.roidb = dt.roidb
 end
 
+if false then
 bp = nnf.BatchProviderROI(ds)
 bp:setupData()
+else
+  bp = nnf.BatchProviderROI(ds)
+  local temp = torch.load('pascal_2007_train_bp.t7')
+  bp.bboxes = temp.bboxes
+end
 
 ---------------------------------------------------------------------------------------
 -- model
@@ -61,7 +67,7 @@ model:training()
 
 criterion = nn.CrossEntropyCriterion():float()
 
-max_iter = 10
+max_iter = 20
 
 function train()
   local err = 0
