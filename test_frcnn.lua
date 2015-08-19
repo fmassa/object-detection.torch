@@ -23,11 +23,16 @@ else
   ds.roidb = dt.roidb
 end
 
+local image_transformer= nnf.ImageTransformer{mean_pix={103.939, 116.779, 123.68},
+                                              raw_scale = 255,
+                                              swap = {3,2,1}}
 if true then
   bp = nnf.BatchProviderROI(ds)
+  bp.image_transformer = image_transformer
   bp:setupData()
 else
   bp = nnf.BatchProviderROI(ds)
+  bp.image_transformer = image_transformer
   local temp = torch.load('pascal_2007_train_bp.t7')
   bp.bboxes = temp.bboxes
 end
@@ -94,12 +99,16 @@ end
 print(model)
 parameters,gradParameters = model:getParameters()
 
-optimState = {learningRate = 1e-3, weightDecay = 0.0005, momentum = 0.9,
+optimState = {learningRate = 1e-4, weightDecay = 0.0005, momentum = 0.9,
               learningRateDecay = 0}
 
 --------------------------------------------------------------------------
 -- training
 --------------------------------------------------------------------------
+
+confusion_matrix = optim.ConfusionMatrix(21)
+
+savedModel = model:clone('weight','bias','running_mean','running_std')
 
 model:cuda()
 model:training()
@@ -138,6 +147,8 @@ function train()
         gradParameters:div(batchSize)
         f = f/batchSize
       end
+      
+      confusion_matrix:batchAdd(outputs,target)
 
       return f,gradParameters
     end
@@ -157,7 +168,12 @@ for i=1,num_iter do
   if i%(stepsize/display_iter) == 0 then
     optimState.learningRate = optimState.learningRate/10
   end
+  
+  confusion_matrix:zero()
 
   train()
-  
+  print(confusion_matrix)
+  if i%100 == 0 then
+    torch.save(paths.concat('cachedir','frcnn_t1.t7'),savedModel)
+  end
 end
