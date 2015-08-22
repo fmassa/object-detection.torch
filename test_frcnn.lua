@@ -1,4 +1,8 @@
 require 'nnf'
+require 'inn'
+require 'cudnn'
+
+cutorch.setDevice(1)
 
 dt = torch.load('pascal_2007_train.t7')
 if false then
@@ -19,22 +23,34 @@ if false then
     ds.roidb[i] = torch.IntTensor(10,4):random(1,5)
     ds.roidb[i][{{},{3,4}}]:add(6)
   end
-else
+elseif true then
   ds.roidb = dt.roidb
 end
 
-local image_transformer= nnf.ImageTransformer{mean_pix={103.939, 116.779, 123.68},
+local image_transformer= nnf.ImageTransformer{mean_pix={102.9801,115.9465,122.7717},--{103.939, 116.779, 123.68},
                                               raw_scale = 255,
                                               swap = {3,2,1}}
 if true then
   bp = nnf.BatchProviderROI(ds)
   bp.image_transformer = image_transformer
+  bp.bg_threshold = {0.1,0.5}
   bp:setupData()
 else
   bp = nnf.BatchProviderROI(ds)
   bp.image_transformer = image_transformer
   local temp = torch.load('pascal_2007_train_bp.t7')
   bp.bboxes = temp.bboxes
+end
+
+
+if false then
+  local mytest = nnf.ROIPooling(50,50):float()
+  function do_mytest()
+    local input0,target0 = bp:getBatch(input0,target0)
+    local o = mytest:forward(input0)
+    return input0,target0,o
+  end
+  --input0,target0,o = do_mytest()
 end
 
 ---------------------------------------------------------------------------------------
@@ -58,7 +74,7 @@ do
     classifier:add(nn.Dropout(0.5))
     classifier:add(nn.Linear(1024,21))
   
-  else
+  elseif false then
     require 'loadcaffe'
 --    local rcnnfold = '/home/francisco/work/libraries/rcnn/'
 --    local base_model = loadcaffe.load(
@@ -83,6 +99,23 @@ do
     classifier:add(nn.Linear(4096,21):cuda())
     
     collectgarbage()
+
+  else
+    local fold = 'data/models/imagenet_models/alexnet/'
+    local m1 = torch.load(fold..'features.t7')
+    local m2 = torch.load(fold..'top.t7')
+
+    for i=1,14 do
+      features:add(m1:get(i):clone())
+    end
+
+    for i=2,7 do
+      classifier:add(m2:get(i):clone())
+    end
+    local linear = nn.Linear(4096,21):cuda()
+    linear.weight:normal(0,0.01)
+    linear.bias:zero()
+    classifier:add(linear)
   end
   collectgarbage()
 
@@ -90,16 +123,18 @@ do
   prl:add(features)
   prl:add(nn.Identity())
   model:add(prl)
-  model:add(nnf.ROIPooling(6,6):setSpatialScale(1/16))
-  --model:add(inn.ROIPooling(6,6):setSpatialScale(1/16))
+  --model:add(nnf.ROIPooling(6,6):setSpatialScale(1/16))
+  model:add(inn.ROIPooling(6,6):setSpatialScale(1/16))
   model:add(nn.View(-1):setNumInputDims(3))
   model:add(classifier)
 
 end
 print(model)
+
+model:cuda()
 parameters,gradParameters = model:getParameters()
 
-optimState = {learningRate = 1e-4, weightDecay = 0.0005, momentum = 0.9,
+optimState = {learningRate = 1e-3, weightDecay = 0.0005, momentum = 0.9,
               learningRateDecay = 0}
 
 --------------------------------------------------------------------------
@@ -108,16 +143,20 @@ optimState = {learningRate = 1e-4, weightDecay = 0.0005, momentum = 0.9,
 
 confusion_matrix = optim.ConfusionMatrix(21)
 
-savedModel = model:clone('weight','bias','running_mean','running_std')
 
-model:cuda()
 model:training()
 
+savedModel = model:clone('weight','bias','running_mean','running_std')
+
 criterion = nn.CrossEntropyCriterion():cuda()
+--criterion.nll.sizeAverage = false
+
+--normalize = true
 
 display_iter = 20
 
-inputs = {torch.CudaTensor(),torch.FloatTensor()}
+--inputs = {torch.CudaTensor(),torch.FloatTensor()}
+inputs = {torch.CudaTensor(),torch.CudaTensor()}
 target = torch.CudaTensor()
 
 function train()
@@ -159,9 +198,12 @@ function train()
   print('Training error: '..err/display_iter)
 end
 
+epoch_size = math.ceil(ds:size()/bp.imgs_per_batch)
 stepsize = 30000
+print_step = 10
+num_iter = 40000/display_iter--3000
 
-num_iter = 3000
+confusion_matrix:zero()
 
 for i=1,num_iter do
   print(('Iteration: %d/%d'):format(i,num_iter))
@@ -169,10 +211,13 @@ for i=1,num_iter do
     optimState.learningRate = optimState.learningRate/10
   end
   
-  confusion_matrix:zero()
-
   train()
-  print(confusion_matrix)
+
+  if i%print_step == 0 then
+    print(confusion_matrix)
+    confusion_matrix:zero()
+  end
+
   if i%100 == 0 then
     torch.save(paths.concat('cachedir','frcnn_t1.t7'),savedModel)
   end
