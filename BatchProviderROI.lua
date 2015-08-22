@@ -12,10 +12,8 @@ end
 -- setup is the same
 
 function BatchProviderROI:permuteIdx()
-  local fg_num_each  = self.fg_num_each
-  local bg_num_each  = self.bg_num_each
-  local fg_num_total = self.fg_num_total
-  local bg_num_total = self.bg_num_total
+  --local fg_num_total = self.fg_num_total
+  --local bg_num_total = self.bg_num_total
   local total_img    = self.dataset:size()
   local imgs_per_batch = self.imgs_per_batch
 
@@ -26,8 +24,8 @@ function BatchProviderROI:permuteIdx()
     self._cur = 1
   end
 
-  local img_idx      = self._perm[{{self._cur,self._cur + self.imgs_per_batch - 1}}]
-  self._cur = self._cur + self.imgs_per_batch
+  local img_idx = self._perm[{{self._cur,self._cur + self.imgs_per_batch - 1}}]
+  self._cur     = self._cur + self.imgs_per_batch
 
   local img_idx_end  = imgs_per_batch
 
@@ -55,12 +53,16 @@ function BatchProviderROI:permuteIdx()
 end
 
 function BatchProviderROI:selectBBoxes(fg_windows,bg_windows,im_scales)
+  local fg_num_each  = self.fg_num_each
+  local bg_num_each  = self.bg_num_each
+
   local rois = {}
   local labels = {}
   for im=1,self.imgs_per_batch do
     local im_scale = im_scales[im]
     local window_idx = torch.randperm(#bg_windows[im])
-    for i=1,math.min(self.bg_num_each,#bg_windows[im]) do
+    local end_idx = math.min(bg_num_each,#bg_windows[im])
+    for i=1,end_idx do
       local curr_idx = bg_windows[im][window_idx[i] ][1]
       local position = bg_windows[im][window_idx[i] ][2]
       local dd = self.bboxes[curr_idx][0][position][{{2,5}}]
@@ -70,7 +72,8 @@ function BatchProviderROI:selectBBoxes(fg_windows,bg_windows,im_scales)
     end
 
     window_idx = torch.randperm(#fg_windows[im])
-    for i=1,math.min(self.fg_num_each,#fg_windows[im]) do
+    local end_idx = math.min(fg_num_each,#fg_windows[im])
+    for i=1,end_idx do
       local curr_idx = fg_windows[im][window_idx[i] ][1]
       local position = fg_windows[im][window_idx[i] ][2]
       local dd = self.bboxes[curr_idx][1][position][{{2,5}}]
@@ -110,7 +113,7 @@ local function getImages(self,img_ids,images)
   -- create single tensor with all images, padding with zero for different sizes
   im_sizes = torch.IntTensor(im_sizes)
   local max_shape = im_sizes:max(1)[1]
-  images:resize(num_images,3,max_shape[1],max_shape[2])
+  images:resize(num_images,3,max_shape[1],max_shape[2]):zero()
   for i=1,num_images do
     images[i][{{},{1,imgs[i]:size(2)},{1,imgs[i]:size(3)}}]:copy(imgs[i])
   end
