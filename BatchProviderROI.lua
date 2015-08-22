@@ -65,7 +65,7 @@ function BatchProviderROI:selectBBoxes(fg_windows,bg_windows,im_scales)
     for i=1,end_idx do
       local curr_idx = bg_windows[im][window_idx[i] ][1]
       local position = bg_windows[im][window_idx[i] ][2]
-      local dd = self.bboxes[curr_idx][0][position][{{2,5}}]
+      local dd = self.bboxes[curr_idx][0][position][{{2,5}}]:clone()
       dd:add(-1):mul(im_scale):add(1)
       table.insert(rois,{im,dd[1],dd[2],dd[3],dd[4]})
       table.insert(labels,self.bboxes[curr_idx][0][position][6])
@@ -76,7 +76,7 @@ function BatchProviderROI:selectBBoxes(fg_windows,bg_windows,im_scales)
     for i=1,end_idx do
       local curr_idx = fg_windows[im][window_idx[i] ][1]
       local position = fg_windows[im][window_idx[i] ][2]
-      local dd = self.bboxes[curr_idx][1][position][{{2,5}}]
+      local dd = self.bboxes[curr_idx][1][position][{{2,5}}]:clone()
       dd:add(-1):mul(im_scale):add(1)
       table.insert(rois,{im,dd[1],dd[2],dd[3],dd[4]})
       table.insert(labels,self.bboxes[curr_idx][1][position][6])
