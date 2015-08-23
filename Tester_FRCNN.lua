@@ -101,6 +101,7 @@ function Tester:test(iteration)
     io.write(('test: (%s) %5d/%-5d '):format(dataset.dataset_name,i,dataset:size()));
     boxes = dataset:getROIBoxes(i):float()
     local im = dataset:getImage(i)
+    timer3:reset()
     local output = detec:detect(im,boxes)
 
     local add_bg = 0

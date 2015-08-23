@@ -29,6 +29,13 @@ function ROIPooling:updateOutput(input)
   rois[{{},4}]:cmin(s[ss])
   rois[{{},5}]:cmin(s[ss-1])
 
+  -- element access is faster if not a cuda tensor
+  if rois:type() == 'torch.CudaTensor' then
+    self._rois = self._rois or torch.FloatTensor()
+    self._rois:resize(rois:size()):copy(rois)
+    rois = self._rois
+  end
+
   if not self._type then self._type = output:type() end
 
   if #self.pooler < num_rois then
@@ -50,6 +57,9 @@ end
 function ROIPooling:updateGradInput(input,gradOutput)
   local data = input[1]
   local rois = input[2]
+  if rois:type() == 'torch.CudaTensor' then
+    rois = self._rois
+  end
   local num_rois = rois:size(1)
   local s = data:size()
   local ss = s:size(1)
