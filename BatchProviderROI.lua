@@ -46,13 +46,13 @@ function BatchProviderROI:permuteIdx()
       end
     end
   end
-  
-  local opts = {img_idx=img_idx,img_idx_end=img_idx_end}
+  local do_flip = torch.FloatTensor(imgs_per_batch):random(0,1)
+  local opts = {img_idx=img_idx,img_idx_end=img_idx_end,do_flip=do_flip}
   return fg_windows,bg_windows,opts
 
 end
 
-function BatchProviderROI:selectBBoxes(fg_windows,bg_windows,im_scales)
+function BatchProviderROI:selectBBoxes(fg_windows,bg_windows,im_scales,do_flip,im_sizes)
   local fg_num_each  = self.fg_num_each
   local bg_num_each  = self.bg_num_each
 
@@ -62,11 +62,18 @@ function BatchProviderROI:selectBBoxes(fg_windows,bg_windows,im_scales)
     local im_scale = im_scales[im]
     local window_idx = torch.randperm(#bg_windows[im])
     local end_idx = math.min(bg_num_each,#bg_windows[im])
+    local flip = do_flip[im] == 1
+    local im_size = im_sizes[im]
     for i=1,end_idx do
       local curr_idx = bg_windows[im][window_idx[i] ][1]
       local position = bg_windows[im][window_idx[i] ][2]
       local dd = self.bboxes[curr_idx][0][position][{{2,5}}]:clone()
       dd:add(-1):mul(im_scale):add(1)
+      if flip then
+        local tt = dd[1]
+        dd[1] = im_size[2]-dd[3] +1
+        dd[3] = im_size[2]-tt    +1
+      end
       table.insert(rois,{im,dd[1],dd[2],dd[3],dd[4]})
       table.insert(labels,self.bboxes[curr_idx][0][position][6])
     end
@@ -78,6 +85,11 @@ function BatchProviderROI:selectBBoxes(fg_windows,bg_windows,im_scales)
       local position = fg_windows[im][window_idx[i] ][2]
       local dd = self.bboxes[curr_idx][1][position][{{2,5}}]:clone()
       dd:add(-1):mul(im_scale):add(1)
+      if flip then
+        local tt = dd[1]
+        dd[1] = im_size[2]-dd[3] +1
+        dd[3] = im_size[2]-tt    +1
+      end
       table.insert(rois,{im,dd[1],dd[2],dd[3],dd[4]})
       table.insert(labels,self.bboxes[curr_idx][1][position][6])
     end
@@ -87,7 +99,7 @@ function BatchProviderROI:selectBBoxes(fg_windows,bg_windows,im_scales)
   return rois, labels
 end
 
-local function getImages(self,img_ids,images)
+local function getImages(self,img_ids,images,do_flip)
   local dataset = self.dataset
   local num_images = img_ids:size(1)
 
@@ -98,6 +110,10 @@ local function getImages(self,img_ids,images)
   for i=1,num_images do
     local im = dataset:getImage(img_ids[i])
     im = self.image_transformer:preprocess(im)
+    local flip = do_flip[i] == 1
+    if flip then
+      im = image.hflip(im)
+    end
     local im_size = im[1]:size()
     local im_size_min = math.min(im_size[1],im_size[2])
     local im_size_max = math.max(im_size[1],im_size[2])
@@ -117,7 +133,7 @@ local function getImages(self,img_ids,images)
   for i=1,num_images do
     images[i][{{},{1,imgs[i]:size(2)},{1,imgs[i]:size(3)}}]:copy(imgs[i])
   end
-  return im_scales
+  return im_scales,im_sizes
 end
 
 
@@ -133,8 +149,8 @@ function BatchProviderROI:getBatch(batches,targets)
   local batches = batches or {torch.FloatTensor(),torch.FloatTensor()}
   local targets = targets or torch.FloatTensor()
   
-  local im_scales = getImages(self,opts.img_idx,batches[1])
-  local rois,labels = self:selectBBoxes(fg_windows,bg_windows,im_scales)
+  local im_scales, im_sizes = getImages(self,opts.img_idx,batches[1],opts.do_flip)
+  local rois,labels = self:selectBBoxes(fg_windows,bg_windows,im_scales,opts.do_flip, im_sizes)
   batches[2]:resizeAs(rois):copy(rois)
   targets:resize(labels:size()):copy(labels)
   
