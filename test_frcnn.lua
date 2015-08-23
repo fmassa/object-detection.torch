@@ -2,7 +2,7 @@ require 'nnf'
 require 'inn'
 require 'cudnn'
 
-cutorch.setDevice(1)
+cutorch.setDevice(2)
 
 dt = torch.load('pascal_2007_train.t7')
 if false then
@@ -11,7 +11,7 @@ if false then
                          roidbdir='/home/francisco/work/datasets/rcnn/selective_search_data'
                         }
 else
-  ds = nnf.DataSetPascal{image_set='train',
+  ds = nnf.DataSetPascal{image_set='trainval',
                          datadir='datasets/VOCdevkit',
                          roidbdir='data/selective_search_data'
                          }
@@ -23,7 +23,7 @@ if false then
     ds.roidb[i] = torch.IntTensor(10,4):random(1,5)
     ds.roidb[i][{{},{3,4}}]:add(6)
   end
-elseif true then
+elseif false then
   ds.roidb = dt.roidb
 end
 
@@ -123,8 +123,8 @@ do
   prl:add(features)
   prl:add(nn.Identity())
   model:add(prl)
-  --model:add(nnf.ROIPooling(6,6):setSpatialScale(1/16))
-  model:add(inn.ROIPooling(6,6):setSpatialScale(1/16))
+  model:add(nnf.ROIPooling(6,6):setSpatialScale(1/16))
+  --model:add(inn.ROIPooling(6,6):setSpatialScale(1/16))
   model:add(nn.View(-1):setNumInputDims(3))
   model:add(classifier)
 
@@ -155,8 +155,8 @@ criterion = nn.CrossEntropyCriterion():cuda()
 
 display_iter = 20
 
---inputs = {torch.CudaTensor(),torch.FloatTensor()}
-inputs = {torch.CudaTensor(),torch.CudaTensor()}
+inputs = {torch.CudaTensor(),torch.FloatTensor()}
+--inputs = {torch.CudaTensor(),torch.CudaTensor()}
 target = torch.CudaTensor()
 
 function train()
@@ -219,6 +219,18 @@ for i=1,num_iter do
   end
 
   if i%100 == 0 then
-    torch.save(paths.concat('cachedir','frcnn_t1.t7'),savedModel)
+    torch.save(paths.concat('cachedir','frcnn_t2.t7'),savedModel)
   end
 end
+
+-- test
+dsv = nnf.DataSetPascal{image_set='test',
+                         datadir='datasets/VOCdevkit',
+                         roidbdir='data/selective_search_data'
+                         }
+
+
+local fpv = {dataset=dsv}
+tester = nnf.Tester_FRCNN(model,fpv)
+tester.cachefolder = 'cachedir/frcnn_t2'
+tester:test(num_iter)
