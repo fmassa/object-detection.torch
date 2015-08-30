@@ -53,8 +53,8 @@ function BatchProviderROI:permuteIdx()
 end
 
 function BatchProviderROI:selectBBoxes(fg_windows,bg_windows,im_scales,do_flip,im_sizes)
-  local fg_num_each  = self.fg_num_each
-  local bg_num_each  = self.bg_num_each
+  local fg_num_each  = torch.round(self.fg_num_each/self.imgs_per_batch)
+  local bg_num_each  = torch.round(self.bg_num_each/self.imgs_per_batch)
 
   local rois = {}
   local labels = {}
@@ -121,7 +121,7 @@ local function getImages(self,img_ids,images,do_flip)
     if torch.round(im_scale*im_size_max) > self.max_size then
        im_scale = self.max_size/im_size_max
     end
-    local im_s = {im_size[1]*im_scale,im_size[2]*im_scale}
+    local im_s = {torch.round(im_size[1]*im_scale),torch.round(im_size[2]*im_scale)}
     table.insert(imgs,image.scale(im,im_s[2],im_s[1]))
     table.insert(im_sizes,im_s)
     table.insert(im_scales,im_scale)
