@@ -1,6 +1,7 @@
 require 'nnf'
 require 'inn'
 require 'cudnn'
+require 'gnuplot'
 
 cutorch.setDevice(2)
 
@@ -92,7 +93,6 @@ do
     for i=1,14 do
       features:add(base_model:get(i):clone())
     end
-
     for i=17,22 do
       classifier:add(base_model:get(i):clone())
     end
@@ -108,7 +108,11 @@ do
     for i=1,14 do
       features:add(m1:get(i):clone())
     end
-
+    features:get(3).padW = 1
+    features:get(3).padH = 1
+    features:get(7).padW = 1
+    features:get(7).padH = 1
+ 
     for i=2,7 do
       classifier:add(m2:get(i):clone())
     end
@@ -123,8 +127,8 @@ do
   prl:add(features)
   prl:add(nn.Identity())
   model:add(prl)
-  model:add(nnf.ROIPooling(6,6):setSpatialScale(1/16))
-  --model:add(inn.ROIPooling(6,6):setSpatialScale(1/16))
+  --model:add(nnf.ROIPooling(6,6):setSpatialScale(1/16))
+  model:add(inn.ROIPooling(6,6):setSpatialScale(1/16))
   model:add(nn.View(-1):setNumInputDims(3))
   model:add(classifier)
 
@@ -134,8 +138,22 @@ print(model)
 model:cuda()
 parameters,gradParameters = model:getParameters()
 
-optimState = {learningRate = 1e-3, weightDecay = 0.0005, momentum = 0.9,
-              learningRateDecay = 0}
+parameters2,gradParameters2 = model:parameters()
+
+lr = {0,0,1,2,1,2,1,2,1,2,1,2,1,2,1,2}
+wd = {0,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0}
+
+local function updateGPlrwd(clr)
+  local clr = clr or 1
+  for i,p in pairs(gradParameters2) do
+    p:add(wd[i]*0.0005,parameters2[i])
+    p:mul(lr[i]*clr)
+  end
+end
+
+optimState = {learningRate = 1,--1e-3,
+              weightDecay = 0.000, momentum = 0.9,
+              learningRateDecay = 0, dampening=0}
 
 --------------------------------------------------------------------------
 -- training
@@ -155,9 +173,11 @@ criterion = nn.CrossEntropyCriterion():cuda()
 
 display_iter = 20
 
-inputs = {torch.CudaTensor(),torch.FloatTensor()}
---inputs = {torch.CudaTensor(),torch.CudaTensor()}
+--inputs = {torch.CudaTensor(),torch.FloatTensor()}
+inputs = {torch.CudaTensor(),torch.CudaTensor()}
 target = torch.CudaTensor()
+
+learningRate = 1e-3
 
 function train()
   local err = 0
@@ -182,6 +202,10 @@ function train()
 
       model:backward(inputs,df_do)
 
+      -- mimic different learning rates per layer
+      -- without the cost of having a huge tensor
+      updateGPlrwd(learningRate)
+
       if normalize then
         gradParameters:div(batchSize)
         f = f/batchSize
@@ -196,30 +220,52 @@ function train()
     err = err + fx[1]
   end
   print('Training error: '..err/display_iter)
+  return err/display_iter
 end
 
 epoch_size = math.ceil(ds:size()/bp.imgs_per_batch)
-stepsize = 30000
+stepsize = 30000--30000
 print_step = 10
-num_iter = 40000/display_iter--3000
+num_iter = 40000--40000
+num_iter = num_iter/display_iter--3000
 
 confusion_matrix:zero()
+train_err = {}
+exp_name = 'frcnn_t11'
 
+paths.mkdir(paths.concat('cachedir',exp_name))
+--logger = optim.Logger(paths.concat('cachedir',exp_name,'train_err.log'))
+train_acc = {}
 for i=1,num_iter do
-  print(('Iteration: %d/%d'):format(i,num_iter))
+
   if i%(stepsize/display_iter) == 0 then
-    optimState.learningRate = optimState.learningRate/10
+    --optimState.learningRate = optimState.learningRate/10
+    learningRate = learningRate/10
   end
   
-  train()
+  --print(('Iteration: %d/%d, lr: %.5f'):format(i,num_iter,optimState.learningRate))
+  print(('Iteration: %d/%d, lr: %.5f'):format(i,num_iter,learningRate))
+
+  local t_err = train()
+  table.insert(train_err,t_err)
+
 
   if i%print_step == 0 then
     print(confusion_matrix)
+    table.insert(train_acc,confusion_matrix.averageUnionValid*100)
+    gnuplot.epsfigure(paths.concat('cachedir',exp_name,'train_err.eps'))
+    gnuplot.plot('train',torch.Tensor(train_acc),'-')
+    gnuplot.xlabel('Iterations (200 batch update)')
+    gnuplot.ylabel('Training accuracy')
+    gnuplot.grid('on')
+    gnuplot.plotflush()
+    gnuplot.closeall()
+
     confusion_matrix:zero()
   end
 
   if i%100 == 0 then
-    torch.save(paths.concat('cachedir','frcnn_t2.t7'),savedModel)
+    torch.save(paths.concat('cachedir',exp_name..'.t7'),savedModel)
   end
 end
 
@@ -232,5 +278,5 @@ dsv = nnf.DataSetPascal{image_set='test',
 
 local fpv = {dataset=dsv}
 tester = nnf.Tester_FRCNN(model,fpv)
-tester.cachefolder = 'cachedir/frcnn_t2'
+tester.cachefolder = 'cachedir/'..exp_name
 tester:test(num_iter)
