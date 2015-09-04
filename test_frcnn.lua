@@ -260,9 +260,8 @@ for i=1,num_iter do
     gnuplot.grid('on')
     gnuplot.plotflush()
     gnuplot.closeall()
-
-    confusion_matrix:zero()
   end
+  confusion_matrix:zero()
 
   if i%100 == 0 then
     torch.save(paths.concat('cachedir',exp_name..'.t7'),savedModel)
