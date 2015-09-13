@@ -1,4 +1,4 @@
-local BatchProviderROI, parent = torch.class('nnf.BatchProviderROI','nnf.BatchProvider')
+local BatchProviderROI, parent = torch.class('nnf.BatchProviderROI','nnf.BatchProviderBase')
 
 function BatchProviderROI:__init(dataset)
   local fp = {dataset=dataset}

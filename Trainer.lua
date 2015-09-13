@@ -1,13 +1,16 @@
 require 'nn'
 require 'optim'
 require 'xlua'
+local utils = paths.dofile('utils.lua')
+local recursiveResizeAsCopyTyped = utils.recursiveResizeAsCopyTyped
 
 local Trainer = torch.class('nnf.Trainer')
 
-function Trainer:__init(module,criterion)
+function Trainer:__init(module,criterion,batch_provider)
   
   self.module = module
   self.criterion = criterion
+  self.batch_provider = batch_provider
   
   self.parameters,self.gradParameters = self.module:getParameters()
   
@@ -22,40 +25,39 @@ function Trainer:__init(module,criterion)
   
 end
 
-
-function Trainer:train(inputs,targets)
-  -- only for batches
-  assert(targets:dim()>2,'Trainer is only for batches')
+function Trainer:train()
   
   self.module:training()
-  self._input = self._input or torch.CudaTensor()
-  self._target = self._target or torch.CudaTensor()
 
   local module = self.module
+  local batch_provider = self.batch_provider
   local parameters = self.parameters
   local gradParameters = self.gradParameters
   
   local criterion = self.criterion
   local optimState = self.optimState
     
-  local batchSize = inputs:size(2)
-  local maxIter = inputs:size(1)
+  --local maxIter = inputs:size(1)
   
   if self.confusion then
     self.confusion:zero()
   end
   local err = 0
   
-  self._input:resize(inputs[1]:size())
-  self._target:resize(targets[1]:size())
-  local input = self._input
-  local target = self._target
-  
+  local input
+  local target
+
   for t=1,maxIter do
     xlua.progress(t,maxIter)
 
-    input:copy(inputs[t])
-    target:copy(targets[t])
+    -- get training batch
+    self.input0,self.target0 = batch_provider(self.input0,self.target0)
+
+    -- copy to ttype
+    self.input,self.input0   = recursiveResizeAsCopyTyped(self.input,self.input0,ttype)
+    self.target,self.target0 = recursiveResizeAsCopyTyped(self.target,self.target0,ttype)
+    input = self.input
+    target = self.target
 
     local feval = function(x)
       if x ~= parameters then
@@ -70,11 +72,6 @@ function Trainer:train(inputs,targets)
       
       module:backward(input,df_do)
       
-      if self.normalize then
-        gradParameters:div(batchSize)
-        f = f/batchSize
-      end
-
       if self.confusion then
         self.confusion:batchAdd(outputs,target)
       end

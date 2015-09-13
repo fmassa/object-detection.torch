@@ -29,6 +29,22 @@ local function joinTable(input,dim)
   return output
 end
 
+local function recursiveResizeAsCopyTyped(t1,t2,type)
+  if torch.type(t2) == 'table' then
+    t1 = (torch.type(t1) == 'table') and t1 or {t1}
+    for key,_ in pairs(t2) do
+      t1[key], t2[key] = recursiveResizeAsCopyTyped(t1[key], t2[key], type)
+    end
+  elseif torch.isTensor(t2) then
+    local type = type or t2:type()
+    t1 = torch.isTypeOf(t1,type) and t1 or torch.Tensor():type(type)
+    t1:resize(t2:size()):copy(t2)
+  else
+    error("expecting nested tensors or tables. Got "..
+    torch.type(t1).." and "..torch.type(t2).." instead")
+  end
+  return t1, t2
+end
 --------------------------------------------------------------------------------
 
 local function keep_top_k(boxes,top_k)
@@ -267,6 +283,7 @@ utils.VOCap = VOCap
 utils.convertCaffeModelToTorch = convertCaffeModelToTorch
 utils.reshapeLastLinearLayer = reshapeLastLinearLayer
 utils.sanitize = sanitize
+utils.recursiveResizeAsCopyTyped = recursiveResizeAsCopyType
 
 return utils
 
