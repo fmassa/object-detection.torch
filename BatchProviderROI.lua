@@ -1,5 +1,48 @@
 local BatchProviderROI, parent = torch.class('nnf.BatchProviderROI','nnf.BatchProviderBase')
 
+local argcheck = require 'argcheck'
+local initcheck = argcheck{
+  pack=true,
+  noordered=true,
+  {name="dataset",
+   type="nnf.DataSetPascal",
+   help="A dataset class" 
+  },
+  {name="batch_size",
+   type="number",
+   opt=true,
+   help="batch size"},
+  {name="batch_size",
+   type="number",
+   opt=true,
+   help="batch size"},
+  {name="fg_fraction",
+   type="number",
+   opt=true,
+   help="foreground fraction in batch" 
+  },
+  {name="fg_threshold",
+   type="number",
+   opt=true,
+   help="foreground threshold" 
+  },
+  {name="bg_threshold",
+   type="table",
+   opt=true,
+   help="background threshold, in the form {LO,HI}" 
+  },
+  {name="createWindow",
+   type="function",
+   opt=true,
+   help="" 
+  },
+  {name="do_flip",
+   type="boolean",
+   opt=true,
+   help="sample batches with random flips" 
+  },
+}
+
 function BatchProviderROI:__init(dataset)
   local fp = {dataset=dataset}
   parent:__init(fp)
@@ -12,8 +55,6 @@ end
 -- setup is the same
 
 function BatchProviderROI:permuteIdx()
-  --local fg_num_total = self.fg_num_total
-  --local bg_num_total = self.bg_num_total
   local total_img    = self.dataset:size()
   local imgs_per_batch = self.imgs_per_batch
 
@@ -137,22 +178,24 @@ local function getImages(self,img_ids,images,do_flip)
 end
 
 
-function BatchProviderROI:getBatch(batches,targets)
+function BatchProviderROI:getBatch()
   local dataset = self.dataset
   
   self.fg_num_each = self.fg_fraction * self.batch_size
   self.bg_num_each = self.batch_size - self.fg_num_each
   
   local fg_windows,bg_windows,opts = self:permuteIdx()
-  --local fg_w,bg_w = self:selectBBoxes(fg_windows,bg_windows)
   
-  local batches = batches or {torch.FloatTensor(),torch.FloatTensor()}
-  local targets = targets or torch.FloatTensor()
+  self.batches = self.batches or {torch.FloatTensor(),torch.FloatTensor()}
+  self.targets = self.targets or torch.FloatTensor()
+  
+  local batches = self.batches
+  local targets = self.targets
   
   local im_scales, im_sizes = getImages(self,opts.img_idx,batches[1],opts.do_flip)
   local rois,labels = self:selectBBoxes(fg_windows,bg_windows,im_scales,opts.do_flip, im_sizes)
   batches[2]:resizeAs(rois):copy(rois)
   targets:resize(labels:size()):copy(labels)
   
-  return batches, targets
+  return self.batches, self.targets
 end

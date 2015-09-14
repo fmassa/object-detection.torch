@@ -1,3 +1,5 @@
+local argcheck = require 'argcheck'
+
 local function createWindowBase(rec,i,j,is_bg)
   local label = is_bg == true and 0+1 or rec.label[j]+1
   local window = {i,rec.boxes[j][1],rec.boxes[j][2],
@@ -29,64 +31,58 @@ end
 
 local argcheck = require 'argcheck'
 local initcheck = argcheck{
-  --pack=true,
-  debug=true,
-  --noordered=true,
---  {name="self",
---   type="nnf.BatchProviderBase"
---  },
---  {name="dataset",
---   type="nnf.DatasetPascal",
---   help="A dataset class" 
---  },
+  pack=true,
+  noordered=true,
+  {name="dataset",
+   type="nnf.DataSetPascal",
+   help="A dataset class" 
+  },
   {name="batch_size",
    type="number",
+   default=128,
    help="batch size"},
   {name="fg_fraction",
    type="number",
+   default=0.25,
    help="foreground fraction in batch" 
   },
   {name="fg_threshold",
    type="number",
+   default=0.5,
    help="foreground threshold" 
   },
   {name="bg_threshold",
-   type="number",--"table",
+   type="table",
+   default={0,0.5},
    help="background threshold, in the form {LO,HI}" 
   },
---  {name="createWindow",
---   type="function",
---   default=createWindowBase,
---   help="" 
---  },
+  {name="createWindow",
+   type="function",
+   default=createWindowBase,
+   help="" 
+  },
   {name="do_flip",
    type="boolean",
+   default=true,
    help="sample batches with random flips" 
   },
-
 }
 
 
 local BatchProviderBase = torch.class('nnf.BatchProviderBase')
 
-BatchProviderBase.__init = initcheck
---[[
-function BatchProviderBase:__init(dataset)
-
-  self.dataset = dataset
-
+function BatchProviderBase:__init(...)
+  --local opts = initcheck(...)
+  --for k,v in pairs(opts) do self[k] = v end
+  
   self.batch_size = 128
   self.fg_fraction = 0.25
-  
   self.fg_threshold = 0.5
-  self.bg_threshold = {0.0,0.5}
-  
+  self.bg_threshold = {0,0.5}
   self.createWindow = createWindowBase
-  
   self.do_flip = true
-  
 end
---]]
+
 
 function BatchProviderBase:setupData()
   local dataset = self.dataset
@@ -139,7 +135,7 @@ function BatchProviderBase:setupData()
   --return bbT
 end
 
-function BatchProviderBase:getBatch(input,target)
+function BatchProviderBase:getBatch()
   error("You can't use BatchProviderBase")
   return input,target
 end

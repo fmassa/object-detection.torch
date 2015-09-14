@@ -6,6 +6,7 @@ require 'xlua'
 nnf = {}
 
 torch.include('nnf','DataSetPascal.lua')
+torch.include('nnf','BatchProviderBase.lua')
 torch.include('nnf','BatchProvider.lua')
 torch.include('nnf','BatchProviderROI.lua')
 
