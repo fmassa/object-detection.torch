@@ -1,6 +1,6 @@
 local BatchProvider,parent = 
                     torch.class('nnf.BatchProvider','nnf.BatchProviderBase')
-
+--[[
 local argcheck = require 'argcheck'
 local initcheck = argcheck{
   pack=true,
@@ -55,9 +55,10 @@ local initcheck = argcheck{
    help="sample batches with random flips" 
   },
 }
-
+--]]
+--
 function BatchProvider:__init(...)
-  parent.__init()
+  parent:__init()
 
   self.nTimesMoreData = 10
   self.iter_per_batch = 500
@@ -66,8 +67,8 @@ function BatchProvider:__init(...)
   self.target_dim = 1
 
   
-  local opts = initcheck(...)
-  for k,v in pairs(opts) do self[k] = v end
+  --local opts = initcheck(...)
+  --for k,v in pairs(opts) do self[k] = v end
   
   --self.dataset = feat_provider.dataset
   --self.feat_provider = feat_provider

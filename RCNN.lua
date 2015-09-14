@@ -1,7 +1,10 @@
+local argcheck = require 'argcheck'
+local flipBoundingBoxes = paths.dofile('utils.lua').flipBoundingBoxes
+
 local RCNN = torch.class('nnf.RCNN')
 
 function RCNN:__init(dataset)
-  self.dataset = dataset
+  --self.dataset = dataset
   self.image_transformer = nnf.ImageTransformer{
                                   mean_pix={123.68/255,116.779/255,103.939/255}}
   
@@ -12,9 +15,10 @@ function RCNN:__init(dataset)
   
 end
 
-function RCNN:getCrop(im_idx,bbox,flip)
+function RCNN:getCrop(output,I,bbox)
   -- suppose I is in BGR, as image_mean
   -- [x1 y1 x2 y2] order
+  --[[
   local flip = flip==nil and false or flip
   
   if self.curr_im_idx ~= im_idx or self.curr_doflip ~= flip then
@@ -35,7 +39,8 @@ function RCNN:getCrop(im_idx,bbox,flip)
     bbox[1] = I:size(3)-bbox[3]+1
     bbox[3] = I:size(3)-tt     +1
   end
-  
+  --]]
+  --
   local crop_size = self.crop_size
   local image_mean = self.image_mean
   local padding = self.padding
@@ -45,8 +50,6 @@ function RCNN:getCrop(im_idx,bbox,flip)
   local pad_h = 0;
   local crop_width = crop_size;
   local crop_height = crop_size;
-
-  --local bbox = {bbox[2],bbox[1],bbox[4],bbox[3]}
 
   ------
   if padding > 0 or use_square then
@@ -107,12 +110,11 @@ function RCNN:getCrop(im_idx,bbox,flip)
                                {pad_w+1,pad_w+crop_width}}]
   end
 
-  --patch = torch.zeros(3,crop_size,crop_size):typeAs(I)
-  patch = torch.zeros(3,crop_size,crop_size):float()
+  --patch = torch.FloatTensor(3,crop_size,crop_size):zero()
 
-  patch[{{},{pad_h+1,pad_h+crop_height}, {pad_w+1,pad_w+crop_width}}] = tmp
+  output[{{},{pad_h+1,pad_h+crop_height}, {pad_w+1,pad_w+crop_width}}] = tmp
 
-  return patch
+  return output
 
 end
 
@@ -124,4 +126,31 @@ function RCNN:getFeature(im_idx,bbox,flip)
   return crop_feat
 end
 
+function RCNN:getFeature(im,bbox,flip)
+  local flip = flip==nil and false or flip
 
+  if type(im) == 'number' then
+    
+  end
+  if type(bbox) == 'table' then
+    bbox = torch.FloatTensor(bbox)
+  end
+  
+  im = self.image_transformer:preprocess(im)
+  bbox = bbox:dim() == 1 and bbox:view(1,-1) or bbox
+  local num_boxes = bbox:size(1)
+
+  if flip then
+    im = image.hflip(im)
+    flipBoundingBoxes(bbox,im:size(3))
+  end
+
+  self._feat = self._feat or torch.FloatTensor()
+  self._feat:resize(num_boxes,3,self.crop_size,self.crop_size):zero()
+
+  for i=1,num_boxes do
+    self:getCrop(self._feat[i],im,bbox[i])
+  end
+  
+  return self._feat
+end

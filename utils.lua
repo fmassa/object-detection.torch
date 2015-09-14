@@ -45,6 +45,20 @@ local function recursiveResizeAsCopyTyped(t1,t2,type)
   end
   return t1, t2
 end
+
+-- modify bbox input
+local function flipBoundingBoxes(bbox, im_width)
+  if bbox:dim() == 1 then 
+    local tt = bbox[1]
+    bbox[1] = im_width-bbox[3]+1
+    bbox[3] = im_width-tt     +1
+  else
+    local tt = bbox[{{},1}]:clone()
+    bbox[{{},1}]:fill(im_width+1):add(-1,bbox[{{},3}])
+    bbox[{{},3}]:fill(im_width+1):add(-1,tt)
+  end
+end
+
 --------------------------------------------------------------------------------
 
 local function keep_top_k(boxes,top_k)
@@ -284,6 +298,7 @@ utils.convertCaffeModelToTorch = convertCaffeModelToTorch
 utils.reshapeLastLinearLayer = reshapeLastLinearLayer
 utils.sanitize = sanitize
 utils.recursiveResizeAsCopyTyped = recursiveResizeAsCopyType
+utils.flipBoundingBoxes = flipBoundingBoxes
 
 return utils
 

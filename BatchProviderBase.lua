@@ -72,8 +72,6 @@ local initcheck = argcheck{
 local BatchProviderBase = torch.class('nnf.BatchProviderBase')
 
 function BatchProviderBase:__init(...)
-  --local opts = initcheck(...)
-  --for k,v in pairs(opts) do self[k] = v end
   
   self.batch_size = 128
   self.fg_fraction = 0.25
@@ -81,6 +79,10 @@ function BatchProviderBase:__init(...)
   self.bg_threshold = {0,0.5}
   self.createWindow = createWindowBase
   self.do_flip = true
+
+  local opts = initcheck(...)
+  for k,v in pairs(opts) do self[k] = v end
+
 end
 
 

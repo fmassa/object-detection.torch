@@ -62,26 +62,6 @@ function SPP:getFeature(im_idx,bbox,flip)
   return feat
 end
 
-
-local function cleaningForward(input,model)
-  local currentOutput = model.modules[1]:updateOutput(input)
-  for i=2,#model.modules do
-    collectgarbage()
-    collectgarbage()
-    currentOutput = model.modules[i]:updateOutput(currentOutput)
-    model.modules[i-1].output:resize()
-    model.modules[i-1].gradInput:resize()
-    if model.modules[i-1].gradWeight then
-      model.modules[i-1].gradWeight:resize()
-    end
-    if model.modules[i-1].gradBias then
-      model.modules[i-1].gradBias:resize()
-    end
-  end
-  model.output = currentOutput
-  return currentOutput
-end
-
 function SPP:getConv5(im_idx,flip)
   local scales = self.scales
   local flip = flip or false
@@ -129,7 +109,6 @@ function SPP:getConv5(im_idx,flip)
       local Ir = image.scale(I,sc,sr):type(mtype)
       
       local f = self.model:forward(Ir)
-      --local f = cleaningForward(Ir,self.model)
       
       feats.rsp[i] = torch.FloatTensor(f:size()):copy(f)
     end
