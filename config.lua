@@ -32,7 +32,8 @@ local bp_params = {
 
 local RCNN = {
   fp_params=fp_params,
-  bp_params=bp_params
+  bp_params=bp_params,
+  bp = nnf.BatchProvider
 }
 
 configs.algo.RCNN = RCNN
@@ -68,7 +69,8 @@ local bp_params = {
 
 local SPP = {
   fp_params=fp_params,
-  bp_params=bp_params
+  bp_params=bp_params,
+  bp = nnf.BatchProvider
 }
 
 configs.algo.SPP = SPP
@@ -92,7 +94,8 @@ local bp_params = {
 
 local FRCNN = {
   fp_params=fp_params,
-  bp_params=bp_params
+  bp_params=bp_params,
+  bp = nnf.BatchProviderROI
 }
 
 configs.algo.FRCNN = FRCNN
