@@ -4,11 +4,18 @@ local flipBoundingBoxes = paths.dofile('utils.lua').flipBoundingBoxes
 local SPP = torch.class('nnf.SPP')
 
 --TODO vectorize code ?
-function SPP:__init(dataset,model)
+function SPP:__init(model,dataset)
 
   self.dataset = dataset
   self.model = model
-  self.spp_pooler = inn.SpatialPyramidPooling({{1,1},{2,2},{3,3},{6,6}}):float()
+
+  self.num_feat_chns = 256
+  self.pooling_scales = {{1,1},{2,2},{3,3},{6,6}}
+  local pyr = torch.Tensor(pooling_scales):t()
+  local pooled_size = pyr[1]:dot(pyr[2])
+  self.output_size = {num_chns*pooled_size}
+
+  self.spp_pooler = inn.SpatialPyramidPooling(self.pooling_scales):float()
   self.image_transformer = nnf.ImageTransformer{}
 
 -- paper=864, their code=874 
@@ -37,7 +44,12 @@ function SPP:getCrop(im_idx,bbox,flip)
     self.curr_im_feats = self:getConv5(im_idx,flip)
     self.curr_doflip = flip
   end
-  
+
+  if type(bbox) == 'table' then
+    bbox = torch.FloatTensor(bbox)
+  end
+  bbox = bbox:dim() == 1 and bbox:view(1,-1) or bbox
+
   if flip then
     flipBoundingBoxes(bbox,self.curr_im_feats.imSize[3])
   end
@@ -49,7 +61,7 @@ function SPP:getCrop(im_idx,bbox,flip)
 
   local feat = self.curr_im_feats
   local bestScale,bestbboxes,bboxes_norm,projected_bb =
-            self:projectBoxes(feat, bboxes, feat.scales)
+            self:projectBoxes(feat, bbox, feat.scales)
 
   local crop_feat = {}
   for i=1,bbox:size(1) do
@@ -68,12 +80,13 @@ function SPP:getFeature(im_idx,bbox,flip)
   local crop_feat = self:getCrop(im_idx,bbox,flip)
 
   --local feat = self.spp_pooler:forward(crop_feat)
-  local feat = torch.FloatTensor(#crop_feat,feat_size)
+  self._feat = self._feat or torch.FloatTensor()
+  self._feat:resize(#crop_feat,table.unpack(self.output_size))
   for i=1,#crop_feat do
-    feat[i] = self.spp_pooler:forward(crop_feat[i])
+    self._feat[i]:copy(self.spp_pooler:forward(crop_feat[i]))
   end
 
-  return feat
+  return self._feat
 end
 
 -- SPP is meant to keep a cache of the conv5 features

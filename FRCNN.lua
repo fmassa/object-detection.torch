@@ -102,6 +102,11 @@ function FRCNN:getFeature(imgs,bboxes,flip)
       bboxes = torch.FloatTensor(bboxes)
       bboxes = bboxes:dim() == 1 and {bboxes:view(1,-1)} or {bboxes}
     end
+    if flip == false then
+      flip = {0}
+    elseif flip == true then
+      flip = {1}
+    end
   end
 
   local im_scales, im_sizes = self:processImages(self._feat[1],imgs,flip)

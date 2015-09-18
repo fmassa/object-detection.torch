@@ -4,7 +4,7 @@ local flipBoundingBoxes = paths.dofile('utils.lua').flipBoundingBoxes
 local RCNN = torch.class('nnf.RCNN')
 
 function RCNN:__init(dataset)
-  --self.dataset = dataset
+  self.dataset = dataset
   self.image_transformer = nnf.ImageTransformer{
                                   mean_pix={123.68/255,116.779/255,103.939/255}}
   
@@ -12,6 +12,8 @@ function RCNN:__init(dataset)
   self.image_mean = nil
   self.padding = 16
   self.use_square = false
+
+  self.output_size = {3,self.crop_size,self.crop_size}
   
 end
 
@@ -130,7 +132,8 @@ function RCNN:getFeature(im,bbox,flip)
   local flip = flip==nil and false or flip
 
   if type(im) == 'number' then
-    
+    assert(self.dataset, 'you must provide a dataset if using numeric indices')
+    im = self.dataset:getImage(im)
   end
   if type(bbox) == 'table' then
     bbox = torch.FloatTensor(bbox)
@@ -146,7 +149,8 @@ function RCNN:getFeature(im,bbox,flip)
   end
 
   self._feat = self._feat or torch.FloatTensor()
-  self._feat:resize(num_boxes,3,self.crop_size,self.crop_size):zero()
+
+  self._feat:resize(num_boxes,table.unpack(self.output_size)):zero()
 
   for i=1,num_boxes do
     self:getCrop(self._feat[i],im,bbox[i])
