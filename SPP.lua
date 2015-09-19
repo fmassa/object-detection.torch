@@ -11,11 +11,11 @@ function SPP:__init(model,dataset)
 
   self.num_feat_chns = 256
   self.pooling_scales = {{1,1},{2,2},{3,3},{6,6}}
-  local pyr = torch.Tensor(pooling_scales):t()
+  local pyr = torch.Tensor(self.pooling_scales):t()
   local pooled_size = pyr[1]:dot(pyr[2])
-  self.output_size = {num_chns*pooled_size}
+  self.output_size = {self.num_feat_chns*pooled_size}
 
-  self.spp_pooler = inn.SpatialPyramidPooling(self.pooling_scales):float()
+  --self.spp_pooler = inn.SpatialPyramidPooling(self.pooling_scales):float()
   self.image_transformer = nnf.ImageTransformer{}
 
 -- paper=864, their code=874 
@@ -41,6 +41,28 @@ end
 
 function SPP:evaluate()
   self.train = false
+end
+
+-- here just to check
+function SPP:getCrop_old(im_idx,bbox,flip)
+  local flip = flip or false
+  
+  if self.curr_im_idx ~= im_idx or self.curr_doflip ~= flip then
+    self.curr_im_idx = im_idx
+    self.curr_im_feats = self:getConv5(im_idx,flip)
+    self.curr_doflip = flip
+  end
+
+  if flip then
+    flipBoundingBoxes(bbox,self.curr_im_feats.imSize[3])
+  end
+  
+  local bestScale,bestBbox = self:getBestSPPScale(bbox,self.curr_im_feats.imSize,self.curr_im_feats.scales)
+  local box_norm = self:getResposeBoxes(bestBbox)
+
+  local crop_feat = self:getCroppedFeat(self.curr_im_feats.rsp[bestScale],box_norm)
+
+  return crop_feat,box_norm
 end
 
 function SPP:getCrop(im_idx,bbox,flip)
@@ -73,6 +95,8 @@ function SPP:getCrop(im_idx,bbox,flip)
   local crop_feat = {}
   for i=1,bbox:size(1) do
     local bbox_ = projected_bb[i]
+--    print(bbox_)
+--    print(i)
     local patch = feat.rsp[bestScale[i]][{{},{bbox_[2],bbox_[4]},{bbox_[1],bbox_[3]}}]
     table.insert(crop_feat,patch)
   end
@@ -80,6 +104,17 @@ function SPP:getCrop(im_idx,bbox,flip)
   
   return crop_feat  
 end
+
+-- here just to check
+function SPP:getFeature_old(im_idx,bbox,flip)
+  local flip = flip or false
+
+  local crop_feat = self:getCrop_old(im_idx,bbox,flip)
+
+  local feat = self.spp_pooler:forward(crop_feat)
+  return feat
+end
+
 
 function SPP:getFeature(im_idx,bbox,flip)
   local flip = flip or false
@@ -113,11 +148,15 @@ function SPP:getConv5(im_idx,flip)
     cachedir = ''
   end
 
+  local im_name
   if not self.dataset then
     self.use_cache = false
+    im_name = ''
+  else
+    im_name = self.dataset.img_ids[im_idx]
   end
   
-  local cachefile = paths.concat(self.cachedir,self.dataset.img_ids[im_idx])
+  local cachefile = paths.concat(cachedir,im_name)
 
   if flip then
     cachefile = cachefile..'_flip'
@@ -324,7 +363,7 @@ function SPP:projectBoxes(feat, bboxes, scales)
     bboxArea:map2(bboxes[{{},3}],bboxes[{{},1}],function(xx,xx2,xx1) return xx2-xx1+1 end)
     bboxArea:map2(bboxes[{{},4}],bboxes[{{},2}],function(xx,xx2,xx1) return xx*(xx2-xx1+1) end)
 
-    local expected_scale = bboxArea:pow(-0.5):mul(sz_conv_standard*step_standard*min_dim)
+    local expected_scale = bboxArea:float():pow(-0.5):mul(sz_conv_standard*step_standard*min_dim)
     expected_scale:round()
 
     local nbboxDiffArea = torch.FloatTensor(#scales,nboxes)
@@ -353,10 +392,13 @@ function SPP:projectBoxes(feat, bboxes, scales)
 
   local bboxes_norm = bestbboxes:clone()
   bboxes_norm[{{},{1,2}}]:add(-offset0 + offset):div(step_standard):add( 0.5)
-  bboxes_norm[{{},{1,2}}]:floor():add(1)
+  --bboxes_norm[{{},{1,2}}]:floor():add(1)
   bboxes_norm[{{},{3,4}}]:add(-offset0 - offset):div(step_standard):add(-0.5)
-  bboxes_norm[{{},{3,4}}]:ceil():add(1)
-
+  --bboxes_norm[{{},{3,4}}]:ceil():add(1)
+print(bestbboxes)
+--print(bestbboxes[881])
+print(bboxes_norm)
+--print(bboxes_norm[881])
   local x0gtx1 = bboxes_norm[{{},1}]:gt(bboxes_norm[{{},3}])
   local y0gty1 = bboxes_norm[{{},2}]:gt(bboxes_norm[{{},4}])
 
@@ -386,12 +428,30 @@ function SPP:projectBoxes(feat, bboxes, scales)
     end
   end
 
+  projected_bb:floor()
   return bestScale,bestbboxes,bboxes_norm,projected_bb
 end
 
 -- don't do anything. could be the bbox regression or SVM, but I won't add it here
 function SPP:postProcess(im,bbox,output)
   return output
+end
+
+function SPP:compute(model,inputs)
+  local inputs_s = inputs:split(self.max_batch_size,1)
+
+  self.output = self.output or inputs.new()
+
+  for idx, f in ipairs(inputs_s) do
+    local output0 = model:forward(f)
+    local fs = f:size(1)
+    if idx == 1 then
+      local ss = output0[1]:size():totable()
+      self.output:resize(inputs:size(1),table.unpack(ss))
+    end
+    self.output:narrow(1,(idx-1)*self.max_batch_size+1,fs):copy(output0)
+  end
+  return self.output
 end
 
 function SPP:type(t_type)

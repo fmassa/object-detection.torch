@@ -94,17 +94,16 @@ function Tester:test(iteration)
     timer3:reset()
     local output = detec:detect(im,boxes)
 
-    local add_bg = 1--0
-    --if dataset.num_classes ~= output:size(2) then -- if there is no svm
-      --output = softmax:forward(output) 
-    --  add_bg = 1
-    --end
+    local add_bg = 1
     local tt = 0 
     local tt2 = timer3:time().real
     
     timer2:reset()
+    -- do a NMS for each class, based on the scores from the classifier
     for j=1,dataset.num_classes do
       local scores = output:select(2,j+add_bg)
+      -- only select detections with a score greater than thresh
+      -- this avoid doing NMS on too many bboxes with low score
       local idx = torch.range(1,scores:numel()):long()
       local idx2 = scores:gt(thresh[j])
       idx = idx[idx2]
@@ -123,6 +122,7 @@ function Tester:test(iteration)
         aboxes[j][i] = torch.FloatTensor()
       end
       
+      -- remove low scoring boxes and update threshold
       if i%1000 == 0 then
         aboxes[j],thresh[j] = keep_top_k(aboxes[j],max_per_set)
       end

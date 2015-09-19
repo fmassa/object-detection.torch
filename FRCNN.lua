@@ -20,7 +20,8 @@ function FRCNN:evaluate()
   self.train = false
 end
 
-function FRCNN:processImages(output_imgs,input_imgs,do_flip)
+function FRCNN:processImages(input_imgs,do_flip)
+  local output_imgs = self._feat[1]
   local num_images
   local im
   if self.train then
@@ -69,7 +70,8 @@ function FRCNN:processImages(output_imgs,input_imgs,do_flip)
   return im_scales,im_sizes
 end
 
-function FRCNN:projectImageROIs(rois,im_rois,scales,do_flip,imgs_size)
+function FRCNN:projectImageROIs(im_rois,scales,do_flip,imgs_size)
+  local rois = self._feat[2]
   -- we consider two cases:
   -- During training, the scales are sampled randomly per image, so
   -- in the same image all the bboxes have the same scale, and we only
@@ -95,6 +97,7 @@ function FRCNN:projectImageROIs(rois,im_rois,scales,do_flip,imgs_size)
     end
   else -- not yet tested
     local scales = torch.FloatTensor(scales)
+    im_rois = im_rois[1]
     local widths = im_rois[{{},3}] - im_rois[{{},1}] + 1
     local heights = im_rois[{{},4}] - im_rois[{{}, 2}] + 1
 
@@ -115,16 +118,16 @@ function FRCNN:projectImageROIs(rois,im_rois,scales,do_flip,imgs_size)
 end
 
 function FRCNN:getFeature(imgs,bboxes,flip)
-  --local flip = flip==nil and false or flip
-
   self._feat = self._feat or {torch.FloatTensor(),torch.FloatTensor()}
 
+  -- if it's in test mode, adapt inputs
   if torch.isTensor(imgs) then
     imgs = {imgs}
     if type(bboxes) == 'table' then
       bboxes = torch.FloatTensor(bboxes)
-      bboxes = bboxes:dim() == 1 and {bboxes:view(1,-1)} or {bboxes}
+      bboxes = bboxes:dim() == 1 and bboxes:view(1,-1) or bboxes
     end
+    bboxes = {bboxes}
     if flip == false then
       flip = {0}
     elseif flip == true then
@@ -132,8 +135,8 @@ function FRCNN:getFeature(imgs,bboxes,flip)
     end
   end
 
-  local im_scales, im_sizes = self:processImages(self._feat[1],imgs,flip)
-  self:projectImageROIs(self._feat[2],bboxes,im_scales,flip,im_sizes)
+  local im_scales, im_sizes = self:processImages(imgs,flip)
+  self:projectImageROIs(bboxes,im_scales,flip,im_sizes)
   
   return self._feat
 end
@@ -143,3 +146,8 @@ function FRCNN:postProcess(im,boxes,output)
   -- not implemented yet
   return output
 end
+
+function FRCNN:compute(model, inputs)
+  return model:forward(inputs)
+end
+

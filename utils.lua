@@ -297,7 +297,7 @@ utils.VOCap = VOCap
 utils.convertCaffeModelToTorch = convertCaffeModelToTorch
 utils.reshapeLastLinearLayer = reshapeLastLinearLayer
 utils.sanitize = sanitize
-utils.recursiveResizeAsCopyTyped = recursiveResizeAsCopyType
+utils.recursiveResizeAsCopyTyped = recursiveResizeAsCopyTyped
 utils.flipBoundingBoxes = flipBoundingBoxes
 
 return utils

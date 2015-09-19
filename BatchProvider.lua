@@ -44,11 +44,6 @@ local initcheck = argcheck{
    opt=true,
    help="background threshold, in the form {LO,HI}" 
   },
-  {name="createWindow",
-   type="function",
-   opt=true,
-   help="" 
-  },
   {name="do_flip",
    type="boolean",
    opt=true,
@@ -63,6 +58,7 @@ function BatchProvider:__init(...)
   self.nTimesMoreData = 10
   self.iter_per_batch = 500
   
+  self.dataset = dataset
   self.feat_provider = nnf.RCNN(self.dataset)
   self.batch_dim = self.feat_provider.output_size--{256*50}
   self.target_dim = 1
@@ -154,12 +150,6 @@ function BatchProvider:selectBBoxes(fg_windows,bg_windows)
   return fg_w,bg_w
 end
 
-
--- specific for angle estimation
-local function flip_angle(x)
-  return (-x)%360
-end
-
 -- depends on the model
 function BatchProvider:prepareFeatures(im_idx,bboxes,fg_label,bg_label)
 
@@ -229,6 +219,8 @@ function BatchProvider:prepareBatch(batches,targets)
   fg_label = torch.IntTensor()
   bg_label = torch.IntTensor()
 
+  local pass_index = torch.type(self.feat_provider) == 'nnf.SPP' and true or false
+
   print('==> Preparing Batch Data')
   for i=1,opts.img_idx_end do
     xlua.progress(i,opts.img_idx_end)
@@ -245,7 +237,13 @@ function BatchProvider:prepareBatch(batches,targets)
     bboxes[0] = bg_w[curr_idx]
     bboxes[1] = fg_w[curr_idx]
   
-    fg_data,bg_data = self:prepareFeatures(curr_idx,bboxes,fg_label,bg_label)
+    local data
+    if pass_index then
+      data = curr_idx
+    else
+      data = dataset:getImage(curr_idx)
+    end
+    fg_data,bg_data = self:prepareFeatures(data,bboxes,fg_label,bg_label)
     
     for j=1,nbg do
       bg_counter = bg_counter + 1

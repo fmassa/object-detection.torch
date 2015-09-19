@@ -15,6 +15,7 @@ function RCNN:__init(dataset)
 
   self.output_size = {3,self.crop_size,self.crop_size}
   self.train = true
+  self.max_batch_size = 128
 end
 
 function RCNN:training()
@@ -148,4 +149,21 @@ end
 -- don't do anything. could be the bbox regression or SVM, but I won't add it here
 function RCNN:postProcess(im,bbox,output)
   return output
+end
+
+function RCNN:compute(model,inputs)
+  local inputs_s = inputs:split(self.max_batch_size,1)
+
+  self.output = self.output or inputs.new()
+
+  for idx, f in ipairs(inputs_s) do
+    local output0 = model:forward(f)
+    local fs = f:size(1)
+    if idx == 1 then
+      local ss = output0[1]:size():totable()
+      self.output:resize(inputs:size(1),table.unpack(ss))
+    end
+    self.output:narrow(1,(idx-1)*self.max_batch_size+1,fs):copy(output0)
+  end
+  return self.output
 end

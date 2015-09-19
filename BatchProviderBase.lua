@@ -28,7 +28,7 @@ local function createWindowAngle(rec,i,j,is_bg)
   return window
 end
 
-
+--[[
 local argcheck = require 'argcheck'
 local initcheck = argcheck{
   pack=true,
@@ -67,12 +67,13 @@ local initcheck = argcheck{
    help="sample batches with random flips" 
   },
 }
-
+--]]
 
 local BatchProviderBase = torch.class('nnf.BatchProviderBase')
 
 function BatchProviderBase:__init(...)
   
+  self.dataset = nil
   self.batch_size = 128
   self.fg_fraction = 0.25
   self.fg_threshold = 0.5
@@ -80,11 +81,15 @@ function BatchProviderBase:__init(...)
   self.createWindow = createWindowBase
   self.do_flip = true
 
-  local opts = initcheck(...)
-  for k,v in pairs(opts) do self[k] = v end
+  --local opts = initcheck(...)
+  --for k,v in pairs(opts) do self[k] = v end
 
 end
 
+-- allow changing the way self.bboxes are formatted
+function BatchProviderBase:setCreateWindow(createWindow)
+  self.createWindow = createWindow
+end
 
 function BatchProviderBase:setupData()
   local dataset = self.dataset
