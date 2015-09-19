@@ -62,7 +62,7 @@ function SPP:getCrop_old(im_idx,bbox,flip)
 
   local crop_feat = self:getCroppedFeat(self.curr_im_feats.rsp[bestScale],box_norm)
 
-  return crop_feat,box_norm
+  return crop_feat,box_norm,bestBbox
 end
 
 function SPP:getCrop(im_idx,bbox,flip)
@@ -392,21 +392,18 @@ function SPP:projectBoxes(feat, bboxes, scales)
 
   local bboxes_norm = bestbboxes:clone()
   bboxes_norm[{{},{1,2}}]:add(-offset0 + offset):div(step_standard):add( 0.5)
-  --bboxes_norm[{{},{1,2}}]:floor():add(1)
+  bboxes_norm[{{},{1,2}}]:floor():add(1)
   bboxes_norm[{{},{3,4}}]:add(-offset0 - offset):div(step_standard):add(-0.5)
-  --bboxes_norm[{{},{3,4}}]:ceil():add(1)
-print(bestbboxes)
---print(bestbboxes[881])
-print(bboxes_norm)
---print(bboxes_norm[881])
+  bboxes_norm[{{},{3,4}}]:ceil():add(1)
+
   local x0gtx1 = bboxes_norm[{{},1}]:gt(bboxes_norm[{{},3}])
   local y0gty1 = bboxes_norm[{{},2}]:gt(bboxes_norm[{{},4}])
 
-  bboxes_norm[{{},1}][x0gtx1]:add(bboxes_norm[{{},3}][x0gtx1]):div(2)
-  bboxes_norm[{{},3}][x0gtx1]:copy(bboxes_norm[{{},1}][x0gtx1])
+  bboxes_norm[{{},1}][x0gtx1] = bboxes_norm[{{},1}][x0gtx1]:add(bboxes_norm[{{},3}][x0gtx1]):div(2)
+  bboxes_norm[{{},3}][x0gtx1] = (bboxes_norm[{{},1}][x0gtx1])
 
-  bboxes_norm[{{},2}][y0gty1]:add(bboxes_norm[{{},4}][y0gty1]):div(2)
-  bboxes_norm[{{},4}][y0gty1]:copy(bboxes_norm[{{},2}][y0gty1])
+  bboxes_norm[{{},2}][y0gty1] = bboxes_norm[{{},2}][y0gty1]:add(bboxes_norm[{{},4}][y0gty1]):div(2)
+  bboxes_norm[{{},4}][y0gty1] = (bboxes_norm[{{},2}][y0gty1])
 
   -- remove repeated projections
   if self.dedup then
@@ -428,7 +425,7 @@ print(bboxes_norm)
     end
   end
 
-  projected_bb:floor()
+  --projected_bb:floor()
   return bestScale,bestbboxes,bboxes_norm,projected_bb
 end
 
