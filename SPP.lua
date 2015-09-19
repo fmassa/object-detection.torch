@@ -20,7 +20,6 @@ function SPP:__init(model,dataset)
 
 -- paper=864, their code=874 
   self.scales = {480,576,688,874,1200} -- 874
-  self.randomscale = true
   
   self.sz_conv_standard = 13
   self.step_standard = 16
@@ -33,8 +32,16 @@ function SPP:__init(model,dataset)
 
   self.cachedir = nil
   
+  self.train = true
 end
 
+function SPP:training()
+  self.train = true
+end
+
+function SPP:evaluate()
+  self.train = false
+end
 
 function SPP:getCrop(im_idx,bbox,flip)
   local flip = flip or false
@@ -200,7 +207,8 @@ function SPP:getBestSPPScale(bbox,imSize,scales)
 
   local bestScale
 
-  if self.randomscale then
+  if self.train then
+    -- in training, select the scales randomly
     bestScale = torch.random(1,num_scales)
   else
     local inputArea = self.inputArea
@@ -308,7 +316,8 @@ function SPP:projectBoxes(feat, bboxes, scales)
   -- get best SPP scale
   local bestScale = torch.FloatTensor(nboxes)
 
-  if self.randomscale then
+  if self.train then
+    -- in training, select the scales randomly
     bestScale:random(1,#scales)
   else
     local bboxArea = boxes.new():resize(nboxes):zero()
@@ -380,7 +389,10 @@ function SPP:projectBoxes(feat, bboxes, scales)
   return bestScale,bestbboxes,bboxes_norm,projected_bb
 end
 
-
+-- don't do anything. could be the bbox regression or SVM, but I won't add it here
+function SPP:postProcess(im,bbox,output)
+  return output
+end
 
 function SPP:type(t_type)
   self._type = t_type

@@ -64,24 +64,14 @@ function Tester:test(iteration)
   local module = self.module
   local feat_provider = self.feat_provider
 
-  local pathfolder = paths.concat(self.cachefolder,'test_iter'..iteration)
-  paths.mkdir(pathfolder)  
-
   module:evaluate()
+  feat_provider:evaluate()
   dataset:loadROIDB()
   
-  local feats = torch.FloatTensor()
-  local feats_batched = {}
-  local feats_cuda = torch.CudaTensor()
-  
-  local output = torch.FloatTensor()
-  
-  local output_dim = module:get(module:size())
-  
-  local softmax = nn.SoftMax():float()
-  
+  local detec = nnf.ImageDetect(module, feat_provider)
   local boxes
-  -- 
+  local im
+
   local aboxes = {}
   for i=1,dataset.num_classes do
     table.insert(aboxes,{})
@@ -95,20 +85,20 @@ function Tester:test(iteration)
   local timer = torch.Timer()
   local timer2 = torch.Timer()
   local timer3 = torch.Timer()
-  local detec = nnf.ImageDetect(module)
+
   for i=1,dataset:size() do
     timer:reset()
     io.write(('test: (%s) %5d/%-5d '):format(dataset.dataset_name,i,dataset:size()));
     boxes = dataset:getROIBoxes(i):float()
-    local im = dataset:getImage(i)
+    im = dataset:getImage(i)
     timer3:reset()
     local output = detec:detect(im,boxes)
 
-    local add_bg = 0
-    if dataset.num_classes ~= output:size(2) then -- if there is no svm
+    local add_bg = 1--0
+    --if dataset.num_classes ~= output:size(2) then -- if there is no svm
       --output = softmax:forward(output) 
-      add_bg = 1
-    end
+    --  add_bg = 1
+    --end
     local tt = 0 
     local tt2 = timer3:time().real
     
@@ -140,9 +130,10 @@ function Tester:test(iteration)
     end
 
     io.write((' prepare feat time: %.3f, forward time: %.3f, select time: %.3fs, total time: %.3fs\n'):format(tt,tt2,timer2:time().real,timer:time().real));
-    --collectgarbage()
-    --mattorch.save(paths.concat(pathfolder,dataset.img_ids[i]..'.mat'),output:double())
   end
+
+  local pathfolder = paths.concat(self.cachefolder,'test_iter'..iteration)
+  paths.mkdir(pathfolder)
 
   for i = 1,dataset.num_classes do
     -- go back through and prune out detections below the found threshold
@@ -156,10 +147,14 @@ function Tester:test(iteration)
         end
       end
     end
-    save_file = paths.concat(pathfolder, dataset.classes[i].. '_boxes_'.. 
-                             dataset.dataset_name..self.suffix)
-    torch.save(save_file, aboxes)
+    --save_file = paths.concat(pathfolder, dataset.classes[i].. '_boxes_'..
+    --                         dataset.dataset_name..self.suffix)
+    --torch.save(save_file, aboxes)
   end
+  save_file = paths.concat(pathfolder, 'boxes_'..
+                           dataset.dataset_name..self.suffix)
+  torch.save(save_file, aboxes)
+
 
   local res = {}
   for i=1,dataset.num_classes do

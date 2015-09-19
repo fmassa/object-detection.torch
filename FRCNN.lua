@@ -6,26 +6,47 @@ function FRCNN:__init()
   self.image_transformer = nnf.ImageTransformer{}
   self.scale = {600}
   self.max_size = 1000
-  self.randomscale = true
+
+  self.train = true
   
-  --self.inputArea = 224^2
+  self.inputArea = 224^2
+end
+
+function FRCNN:training()
+  self.train = true
+end
+
+function FRCNN:evaluate()
+  self.train = false
 end
 
 function FRCNN:processImages(output_imgs,input_imgs,do_flip)
-  local num_images = #input_imgs
+  local num_images
+  local im
+  if self.train then
+    num_images = #input_imgs
+  else
+    num_images = #self.scale
+    im = self.image_transformer:preprocess(input_imgs[1])
+  end
 
   local imgs = {}
   local im_sizes = {}
   local im_scales = {}
 
   for i=1,num_images do
-    local im = input_imgs[i]
-    im = self.image_transformer:preprocess(im)
+    local scale
+    if self.train then
+      im = input_imgs[i]
+      im = self.image_transformer:preprocess(im)
+      scale = self.scale[math.random(1,#self.scale)]
+    else
+      scale = self.scale[i]
+    end
     local flip = do_flip and (do_flip[i] == 1) or false
     if flip then
       im = image.hflip(im)
     end
-    local scale = self.scale[math.random(1,#self.scale)]
     local im_size = im[1]:size()
     local im_size_min = math.min(im_size[1],im_size[2])
     local im_size_max = math.max(im_size[1],im_size[2])
@@ -48,44 +69,46 @@ function FRCNN:processImages(output_imgs,input_imgs,do_flip)
   return im_scales,im_sizes
 end
 
--- only for single image ATM, not working yet
-local function project_im_rois_eval(im_rois,scales)
-  local levels
-  local rois = torch.FloatTensor()
-  if #scales > 1 then
+function FRCNN:projectImageROIs(rois,im_rois,scales,do_flip,imgs_size)
+  -- we consider two cases:
+  -- During training, the scales are sampled randomly per image, so
+  -- in the same image all the bboxes have the same scale, and we only
+  -- need to take into account the different images that are provided.
+  -- During testing, we consider that there is only one image at a time,
+  -- and the scale for each bbox is the one which makes its area closest
+  -- to self.inputArea
+  if self.train or #scales == 1 then
+    local total_bboxes = 0
+    local cumul_bboxes = {0}
+    for i=1,#scales do
+      total_bboxes = total_bboxes + im_rois[i]:size(1)
+      table.insert(cumul_bboxes,total_bboxes)
+    end
+    rois:resize(total_bboxes,5)
+    for i=1,#scales do
+      local idx = {cumul_bboxes[i]+1,cumul_bboxes[i+1]}
+      rois[{idx,1}]:fill(i)
+      rois[{idx,{2,5}}]:copy(im_rois[i]):add(-1):mul(scales[i]):add(1)
+      if do_flip and do_flip[i] == 1 then
+        flipBoundingBoxes(rois[{idx,{2,5}}],imgs_size[{i,2}])
+      end
+    end
+  else -- not yet tested
     local scales = torch.FloatTensor(scales)
     local widths = im_rois[{{},3}] - im_rois[{{},1}] + 1
     local heights = im_rois[{{},4}] - im_rois[{{}, 2}] + 1
 
     local areas = widths * heights
-    local scaled_areas = areas:view(-1,1) * torch.pow(scales:view(1,-1),2)
-    local diff_areas = torch.abs(scaled_areas - 224 * 224)
-    levels = select(2, diff_areas:min(2))
-  else
-    levels = torch.FloatTensor()
-    rois:resize(im_rois:size(1),5)
-    rois[{{},1}]:fill(1)
-    rois[{{},{2,5}}]:copy(im_rois):add(-1):mul(scales[1]):add(1)
-  end
+    local scaled_areas = areas:view(-1,1) * scales:view(1,-1):pow(2)
+    local diff_areas = scaled_areas:add(-1,self.inputArea):abs() -- no memory copy
+    local levels = select(2, diff_areas:min(2))
 
-  return rois
-end
-
-
-local function project_im_rois(rois,im_rois,scales,do_flip,imgs_size)
-  local total_bboxes = 0
-  local cumul_bboxes = {0}
-  for i=1,#scales do
-    total_bboxes = total_bboxes + im_rois[i]:size(1)
-    table.insert(cumul_bboxes,total_bboxes)
-  end
-  rois:resize(total_bboxes,5)
-  for i=1,#scales do
-    local idx = {cumul_bboxes[i]+1,cumul_bboxes[i+1]}
-    rois[{idx,1}]:fill(i)
-    rois[{idx,{2,5}}]:copy(im_rois[i]):add(-1):mul(scales[i]):add(1)
-    if do_flip and do_flip[i] == 1 then
-      flipBoundingBoxes(rois[{idx,{2,5}}],imgs_size[{i,2}])
+    local num_boxes = im_rois:size(1)
+    rois:resize(num_boxes,5)
+    for i=1,num_boxes do
+      local s = levels[i]
+      rois[{i,{2,5}}]:copy(im_rois[i]):add(-1):mul(scales[s]):add(1)
+      rois[{i,1}] = s
     end
   end
   return rois
@@ -110,8 +133,13 @@ function FRCNN:getFeature(imgs,bboxes,flip)
   end
 
   local im_scales, im_sizes = self:processImages(self._feat[1],imgs,flip)
-  project_im_rois(self._feat[2],bboxes,im_scales,flip,im_sizes)
+  self:projectImageROIs(self._feat[2],bboxes,im_scales,flip,im_sizes)
   
   return self._feat
 end
 
+-- do the bbox regression
+function FRCNN:postProcess(im,boxes,output)
+  -- not implemented yet
+  return output
+end

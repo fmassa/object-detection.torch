@@ -14,35 +14,21 @@ function RCNN:__init(dataset)
   self.use_square = false
 
   self.output_size = {3,self.crop_size,self.crop_size}
-  
+  self.train = true
+end
+
+function RCNN:training()
+  self.train = true
+end
+
+function RCNN:evaluate()
+  self.train = false
 end
 
 function RCNN:getCrop(output,I,bbox)
   -- suppose I is in BGR, as image_mean
   -- [x1 y1 x2 y2] order
-  --[[
-  local flip = flip==nil and false or flip
-  
-  if self.curr_im_idx ~= im_idx or self.curr_doflip ~= flip then
-    self.curr_im_idx = im_idx
-    self.curr_im_feats = self.dataset:getImage(im_idx):float()
-    self.curr_im_feats = self.image_transformer:preprocess(self.curr_im_feats)
-    if flip then
-      self.curr_im_feats = image.hflip(self.curr_im_feats)
-    end
-    self.curr_doflip = flip
-  end
-  
-  local I = self.curr_im_feats
-  local bbox = bbox
-  
-  if flip then
-    local tt = bbox[1]
-    bbox[1] = I:size(3)-bbox[3]+1
-    bbox[3] = I:size(3)-tt     +1
-  end
-  --]]
-  --
+
   local crop_size = self.crop_size
   local image_mean = self.image_mean
   local padding = self.padding
@@ -157,4 +143,9 @@ function RCNN:getFeature(im,bbox,flip)
   end
   
   return self._feat
+end
+
+-- don't do anything. could be the bbox regression or SVM, but I won't add it here
+function RCNN:postProcess(im,bbox,output)
+  return output
 end
