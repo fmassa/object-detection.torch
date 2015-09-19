@@ -36,7 +36,7 @@ function ROIPooling:updateOutput(input)
     rois = self._rois
   end
 
-  if not self._type then self._type = output:type() end
+  if not self._type then self._type = self.output:type() end
 
   if #self.pooler < num_rois then
     local diff = num_rois - #self.pooler
