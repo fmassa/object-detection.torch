@@ -1,6 +1,6 @@
 local BatchProvider,parent = 
                     torch.class('nnf.BatchProvider','nnf.BatchProviderBase')
---[[
+
 local argcheck = require 'argcheck'
 local initcheck = argcheck{
   pack=true,
@@ -9,65 +9,55 @@ local initcheck = argcheck{
    type="nnf.DataSetPascal",
    help="A dataset class" 
   },
-  {name="nTimesMoreData",
-   type="number",
-   opt=true,
-   help=""},
-  {name="iter_per_batch",
-   type="number",
-   opt=true,
-   help=""},
-  {name="batch_dim",
-   type="table",
-   opt=true,
-   help=""},
-  {name="target_dim",
-   type="number",
-   opt=true,
-   help=""},
+  {name="feat_provider",
+   type="nnf.RCNN",
+   help="A feat provider class"
+  },
   {name="batch_size",
    type="number",
-   opt=true,
+   default=128,
    help="batch size"},
+  {name="iter_per_batch",
+   type="number",
+   default=10,
+   help=""},
+  {name="nTimesMoreData",
+   type="number",
+   default=10,
+   help=""},
   {name="fg_fraction",
    type="number",
-   opt=true,
+   default=0.25,
    help="foreground fraction in batch" 
   },
   {name="fg_threshold",
    type="number",
-   opt=true,
+   default=0.5,
    help="foreground threshold" 
   },
   {name="bg_threshold",
    type="table",
-   opt=true,
+   default={0.1,0.5},
    help="background threshold, in the form {LO,HI}" 
   },
+  {name="target_dim",
+   type="number",
+   default=1,
+   help=""},
   {name="do_flip",
    type="boolean",
-   opt=true,
+   default=true,
    help="sample batches with random flips" 
   },
 }
---]]
---
-function BatchProvider:__init(dataset)
+
+function BatchProvider:__init(...)
   parent:__init()
 
-  self.nTimesMoreData = 10
-  self.iter_per_batch = 500
-  
-  self.dataset = dataset
-  self.feat_provider = nnf.RCNN(self.dataset)
-  self.batch_dim = self.feat_provider.output_size--{256*50}
-  self.target_dim = 1
-  
-  --local opts = initcheck(...)
-  --for k,v in pairs(opts) do self[k] = v end
-  
-  --self.dataset = feat_provider.dataset
-  --self.feat_provider = feat_provider
+  local opts = initcheck(...)
+  for k,v in pairs(opts) do self[k] = v end
+
+  self.batch_dim = self.feat_provider.output_size
   
 end
 

@@ -1,5 +1,5 @@
 local BatchProviderROI, parent = torch.class('nnf.BatchProviderROI','nnf.BatchProviderBase')
---[[
+
 local argcheck = require 'argcheck'
 local initcheck = argcheck{
   pack=true,
@@ -8,46 +8,45 @@ local initcheck = argcheck{
    type="nnf.DataSetPascal",
    help="A dataset class" 
   },
+  {name="feat_provider",
+   type="nnf.FRCNN",
+   help="A feat provider class" 
+  },
   {name="batch_size",
    type="number",
    opt=true,
    help="batch size"},
-  {name="batch_size",
+  {name="imgs_per_batch",
    type="number",
-   opt=true,
-   help="batch size"},
+   default=2,
+   help="number of images to sample in a batch"},
   {name="fg_fraction",
    type="number",
-   opt=true,
+   default=0.25,
    help="foreground fraction in batch" 
   },
   {name="fg_threshold",
    type="number",
-   opt=true,
+   default=0.5,
    help="foreground threshold" 
   },
   {name="bg_threshold",
    type="table",
-   opt=true,
+   default={0.1,0.5},
    help="background threshold, in the form {LO,HI}" 
-  },
-  {name="createWindow",
-   type="function",
-   opt=true,
-   help="" 
   },
   {name="do_flip",
    type="boolean",
-   opt=true,
+   default=true,
    help="sample batches with random flips" 
   },
 }
---]]
-function BatchProviderROI:__init(dataset)
+
+function BatchProviderROI:__init(...)
   parent:__init()
-  self.dataset = dataset
-  self.imgs_per_batch = 2
-  self.feat_provider = nnf.FRCNN{}
+
+  local opts = initcheck(...)
+  for k,v in pairs(opts) do self[k] = v end
 end
 
 -- setup is the same

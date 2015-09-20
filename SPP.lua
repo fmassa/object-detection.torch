@@ -3,11 +3,74 @@ local flipBoundingBoxes = paths.dofile('utils.lua').flipBoundingBoxes
 
 local SPP = torch.class('nnf.SPP')
 
---TODO vectorize code ?
-function SPP:__init(model,dataset)
+-- argcheck crashes with that many arguments, and using unordered
+-- doesn't seems practical
+--[[
+local argcheck = require 'argcheck'
+local initcheck = argcheck{
+  pack=true,
+  {name="model",
+   type="nn.Sequential",
+   help="conv5 model"},
+  {name="dataset",
+   type="nnf.DataSetPascal", -- change to allow other datasets
+   opt=true,
+   help="A dataset class"},
+  {name="pooling_scales",
+   type="table",
+   default={{1,1},{2,2},{3,3},{6,6}},
+   help="pooling scales"},
+  {name="num_feat_chns",
+   type="number",
+   default=256,
+   help="number of feature channels to be pooled"},
+  {name="scales",
+   type="table",
+   default={480,576,688,874,1200},
+   help="image scales"},
+  {name="sz_conv_standard",
+   type="number",
+   default=13,
+   help=""},
+  {name="step_standard",
+   type="number",
+   default=16,
+   help=""},
+  {name="offset0",
+   type="number",
+   default=21,
+   help=""},
+  {name="offset",
+   type="number",
+   default=6.5,
+   help=""},
+  {name="inputArea",
+   type="number",
+   default=224^2,
+   help="force square crops"},
+  {name="image_transformer",
+   type="nnf.ImageTransformer",
+   default=nnf.ImageTransformer{},
+   help="Class to preprocess input images"},
+  {name="use_cache",
+   type="boolean",
+   default=true,
+   help=""},
+  {name="cachedir",
+   type="string",
+   opt=true,
+   help=""},
+}
+--]]
+
+
+function SPP:__init(...)
 
   self.dataset = dataset
   self.model = model
+
+  --local opts = initcheck(...)
+  --for k,v in pairs(opts) do self[k] = v end
 
   self.num_feat_chns = 256
   self.pooling_scales = {{1,1},{2,2},{3,3},{6,6}}
@@ -17,7 +80,7 @@ function SPP:__init(model,dataset)
 
   --self.spp_pooler = inn.SpatialPyramidPooling(self.pooling_scales):float()
   self.image_transformer = nnf.ImageTransformer{}
-
+-- [[
 -- paper=864, their code=874 
   self.scales = {480,576,688,874,1200} -- 874
   
@@ -31,7 +94,7 @@ function SPP:__init(model,dataset)
   self.use_cache = true
 
   self.cachedir = nil
-  
+  --]]
   self.train = true
 end
 

@@ -1,21 +1,49 @@
 local argcheck = require 'argcheck'
 local flipBoundingBoxes = paths.dofile('utils.lua').flipBoundingBoxes
 
+local argcheck = require 'argcheck'
+local initcheck = argcheck{
+  pack=true,
+  {name="crop_size",
+   type="number",
+   default=227,
+   help="crop size"},
+  {name="padding",
+   type="number",
+   default=16,
+   help="context padding"},
+  {name="use_square",
+   type="boolean",
+   default=false,
+   help="force square crops"},
+  {name="image_transformer",
+   type="nnf.ImageTransformer",
+   default=nnf.ImageTransformer{},
+   help="Class to preprocess input images"},
+  {name="max_batch_size",
+   type="number",
+   default=128,
+   help="maximum size of batches during evaluation"},
+  {name="dataset",
+   type="nnf.DataSetPascal", -- change to allow other datasets
+   opt=true,
+   help="A dataset class"},
+}
+
+
 local RCNN = torch.class('nnf.RCNN')
 
-function RCNN:__init(dataset)
-  self.dataset = dataset
-  self.image_transformer = nnf.ImageTransformer{
-                                  mean_pix={123.68/255,116.779/255,103.939/255}}
+function RCNN:__init(...)
+--  self.image_transformer = nnf.ImageTransformer{
+--                                  mean_pix={123.68/255,116.779/255,103.939/255}}
   
-  self.crop_size = 227
   self.image_mean = nil
-  self.padding = 16
-  self.use_square = false
+
+  local opts = initcheck(...)
+  for k,v in pairs(opts) do self[k] = v end
 
   self.output_size = {3,self.crop_size,self.crop_size}
   self.train = true
-  self.max_batch_size = 128
 end
 
 function RCNN:training()

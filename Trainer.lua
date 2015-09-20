@@ -15,7 +15,7 @@ function Trainer:__init(module,criterion,batch_provider)
   self.parameters,self.gradParameters = self.module:getParameters()
   
   self.optimState = {learningRate = 1e-3, weightDecay = 0.0005, momentum = 0.9,
-                     learningRateDecay = 0}
+                     learningRateDecay = 0, dampening = 0}
                      
   self.epoch = 0
 
@@ -51,7 +51,7 @@ function Trainer:train()
     xlua.progress(t,maxIter)
 
     -- get training batch
-    self.input0,self.target0 = batch_provider(self.input0,self.target0)
+    self.input0,self.target0 = batch_provider:getBatch()
 
     -- copy to ttype
     self.input,self.input0   = recursiveResizeAsCopyTyped(self.input,self.input0,ttype)
@@ -85,6 +85,6 @@ function Trainer:train()
   
   table.insert(self.fx,err/maxIter)
   
-  self.module:evaluate()
+  --self.module:evaluate()
   self.epoch = self.epoch + 1
 end

@@ -1,15 +1,34 @@
 local flipBoundingBoxes = paths.dofile('utils.lua').flipBoundingBoxes
 local FRCNN = torch.class('nnf.FRCNN')
 
-function FRCNN:__init()
-  
-  self.image_transformer = nnf.ImageTransformer{}
-  self.scale = {600}
-  self.max_size = 1000
+local argcheck = require 'argcheck'
+local initcheck = argcheck{
+  pack=true,
+  {name="scale",
+   type="table",
+   default={600},
+   help="image scales"},
+  {name="max_size",
+   type="number",
+   default=1000,
+   help="maximum dimension of an image"},
+  {name="inputArea",
+   type="number",
+   default=224^2,
+   help="force square crops"},
+  {name="image_transformer",
+   type="nnf.ImageTransformer",
+   default=nnf.ImageTransformer{},
+   help="Class to preprocess input images"},
+}
+
+
+function FRCNN:__init(...)
+
+  local opts = initcheck(...)
+  for k,v in pairs(opts) do self[k] = v end
 
   self.train = true
-  
-  self.inputArea = 224^2
 end
 
 function FRCNN:training()
