@@ -6,14 +6,11 @@ local VOCevaldet = utils.VOCevaldet
 
 local Tester = torch.class('nnf.Tester_FRCNN')
 
-function Tester:__init(module,feat_provider)
-  self.dataset = feat_provider.dataset
-  self.module = module
+function Tester:__init(module,feat_provider,dataset)
+  self.dataset = dataset
   self.feat_provider = feat_provider
+  self.module = module
 
-  self.feat_dim = {256*50}
-  self.max_batch_size = 4000
-  
   self.cachefolder = nil
   self.cachename = nil
   self.suffix = ''
@@ -162,6 +159,15 @@ function Tester:test(iteration)
     res[i] = VOCevaldet(dataset,aboxes[i],cls)
   end
   res = torch.Tensor(res)
+
+  print_scores(dataset,res)
+
+  -- clean roidb to free memory
+  dataset.roidb = nil
+  return res
+end
+
+local function print_scores(dataset,res)
   print('Results:')
   -- print class names
   io.write('|')
@@ -181,8 +187,6 @@ function Tester:test(iteration)
   end
   io.write('\n')
   io.write(('mAP: %.4f\n'):format(res:mean(1)[1]))
-
-  -- clean roidb to free memory
-  dataset.roidb = nil
-  return res
 end
+
+

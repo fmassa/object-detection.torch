@@ -52,8 +52,8 @@ local initcheck = argcheck{
 }
 --]]
 --
-function BatchProvider:__init(...)
-  parent:__init(...)
+function BatchProvider:__init(dataset)
+  parent:__init()
 
   self.nTimesMoreData = 10
   self.iter_per_batch = 500
@@ -156,9 +156,6 @@ function BatchProvider:prepareFeatures(im_idx,bboxes,fg_label,bg_label)
   local num_pos = bboxes[1] and #bboxes[1] or 0
   local num_neg = bboxes[0] and #bboxes[0] or 0
 
-  --fg_data:resize(num_pos,unpack(self.batch_dim))
-  --bg_data:resize(num_neg,unpack(self.batch_dim))
-  
   fg_label:resize(num_pos,self.target_dim)
   bg_label:resize(num_neg,self.target_dim)
   
@@ -171,14 +168,12 @@ function BatchProvider:prepareFeatures(im_idx,bboxes,fg_label,bg_label)
   for i=1,num_pos do
     local bbox = {bboxes[1][i][2],bboxes[1][i][3],bboxes[1][i][4],bboxes[1][i][5]}
     table.insert(s_boxes,bbox)
-    --fg_data[i] = self.feat_provider:getFeature(im_idx,bbox,flip)
     fg_label[i][1] = bboxes[1][i][6]
   end
   
   for i=1,num_neg do
     local bbox = {bboxes[0][i][2],bboxes[0][i][3],bboxes[0][i][4],bboxes[0][i][5]}
     table.insert(s_boxes,bbox)
-    --bg_data[i] = self.feat_provider:getFeature(im_idx,bbox,flip)
     bg_label[i][1] = bboxes[0][i][6]
   end
 
@@ -188,7 +183,6 @@ function BatchProvider:prepareFeatures(im_idx,bboxes,fg_label,bg_label)
   local bg_data = feats:narrow(1,num_pos+1,num_neg)
 
   return fg_data, bg_data
---  return fg_data,bg_data,fg_label,bg_label
 end
 
 function BatchProvider:prepareBatch(batches,targets)
@@ -214,8 +208,6 @@ function BatchProvider:prepareBatch(batches,targets)
   local bg_counter = 0
   
   local fg_data,bg_data,fg_label,bg_label
-  --fg_data  = torch.FloatTensor()
-  --bg_data  = torch.FloatTensor()
   fg_label = torch.IntTensor()
   bg_label = torch.IntTensor()
 

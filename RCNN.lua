@@ -91,7 +91,7 @@ function RCNN:getCrop(output,I,bbox)
   ------
 
   --local patch = image.crop(I,bbox[1],bbox[2],bbox[3],bbox[4]);
-  local patch = image.crop(I,bbox[1],bbox[2],bbox[3],bbox[4]):float();
+  local patch = I[{{},{bbox[2],bbox[4]},{bbox[1],bbox[3]}}]
   local tmp = image.scale(patch,crop_width,crop_height,'bilinear');
 
   if image_mean then
@@ -139,6 +139,7 @@ function RCNN:getFeature(im,bbox,flip)
 
   self._feat:resize(num_boxes,table.unpack(self.output_size)):zero()
 
+  -- use threads to make it faster
   for i=1,num_boxes do
     self:getCrop(self._feat[i],im,bbox[i])
   end

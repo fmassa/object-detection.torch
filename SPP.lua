@@ -62,7 +62,7 @@ function SPP:getCrop_old(im_idx,bbox,flip)
 
   local crop_feat = self:getCroppedFeat(self.curr_im_feats.rsp[bestScale],box_norm)
 
-  return crop_feat,box_norm,bestBbox
+  return crop_feat
 end
 
 function SPP:getCrop(im_idx,bbox,flip)
@@ -83,11 +83,6 @@ function SPP:getCrop(im_idx,bbox,flip)
     flipBoundingBoxes(bbox,self.curr_im_feats.imSize[3])
   end
   
-  --local bestScale,bestBbox = self:getBestSPPScale(bbox,self.curr_im_feats.imSize,self.curr_im_feats.scales)
-  --local box_norm = self:getResposeBoxes(bestBbox)
-
-  --local crop_feat = self:getCroppedFeat(self.curr_im_feats.rsp[bestScale],box_norm)
-
   local feat = self.curr_im_feats
   local bestScale,bestbboxes,bboxes_norm,projected_bb =
             self:projectBoxes(feat, bbox, feat.scales)
@@ -95,12 +90,9 @@ function SPP:getCrop(im_idx,bbox,flip)
   local crop_feat = {}
   for i=1,bbox:size(1) do
     local bbox_ = projected_bb[i]
---    print(bbox_)
---    print(i)
     local patch = feat.rsp[bestScale[i]][{{},{bbox_[2],bbox_[4]},{bbox_[1],bbox_[3]}}]
     table.insert(crop_feat,patch)
   end
-
   
   return crop_feat  
 end
@@ -121,7 +113,6 @@ function SPP:getFeature(im_idx,bbox,flip)
 
   local crop_feat = self:getCrop(im_idx,bbox,flip)
 
-  --local feat = self.spp_pooler:forward(crop_feat)
   self._feat = self._feat or torch.FloatTensor()
   self._feat:resize(#crop_feat,table.unpack(self.output_size))
   for i=1,#crop_feat do

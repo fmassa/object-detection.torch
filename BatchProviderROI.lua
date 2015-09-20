@@ -44,9 +44,10 @@ local initcheck = argcheck{
 }
 --]]
 function BatchProviderROI:__init(dataset)
-  parent:__init{dataset=dataset}
+  parent:__init()
+  self.dataset = dataset
   self.imgs_per_batch = 2
-  self.feature_provider = nnf.FRCNN{}
+  self.feat_provider = nnf.FRCNN{}
 end
 
 -- setup is the same
@@ -141,7 +142,7 @@ function BatchProviderROI:getBatch()
     table.insert(imgs,dataset:getImage(opts.img_idx[i]))
   end
   local boxes,labels = self:selectBBoxes(fg_windows,bg_windows)
-  self.batches = self.feature_provider:getFeature(imgs,boxes,opts.do_flip)
+  self.batches = self.feat_provider:getFeature(imgs,boxes,opts.do_flip)
 
   targets:resize(labels:size()):copy(labels)
   
