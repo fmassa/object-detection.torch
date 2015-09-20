@@ -40,7 +40,7 @@ else
                          datadir=opt.datadir,roidbdir=opt.roidbdir}
   
 
-  feat_provider = FP(ds_train)
+  feat_provider = FP(fp_params)
   batch_provider = BP(bp_params)
   batch_provider:setupData()
 
@@ -59,7 +59,7 @@ else
                               datadir=opt.datadir,roidbdir=opt.roidbdir}
 
 
-  feat_provider_test = FP(ds_test)
+  feat_provider_test = FP(fp_params)
   -- disable flip ?
   bp_params.do_flip = false
   batch_provider_test = BP(bp_params)

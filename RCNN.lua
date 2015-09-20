@@ -185,8 +185,12 @@ function RCNN:compute(model,inputs)
 
   self.output = self.output or inputs.new()
 
+  local ttype = model.output:type()
+  self.inputs = self.inputs or torch.Tensor():type(ttype)
+
   for idx, f in ipairs(inputs_s) do
-    local output0 = model:forward(f)
+    self.inputs:resize(f:size()):copy(f)
+    local output0 = model:forward(self.inputs)
     local fs = f:size(1)
     if idx == 1 then
       local ss = output0[1]:size():totable()

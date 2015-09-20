@@ -1,4 +1,5 @@
 local flipBoundingBoxes = paths.dofile('utils.lua').flipBoundingBoxes
+local recursiveResizeAsCopyTyped = paths.dofile('utils.lua').recursiveResizeAsCopyTyped
 local FRCNN = torch.class('nnf.FRCNN')
 
 local argcheck = require 'argcheck'
@@ -167,6 +168,8 @@ function FRCNN:postProcess(im,boxes,output)
 end
 
 function FRCNN:compute(model, inputs)
-  return model:forward(inputs)
+  local ttype = model.output:type()
+  self.inputs,inputs = recursiveResizeAsCopyTyped(self.inputs,inputs,ttype)
+  return model:forward(self.inputs)
 end
 
