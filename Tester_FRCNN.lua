@@ -68,6 +68,7 @@ function Tester:test(iteration)
   local detec = nnf.ImageDetect(module, feat_provider)
   local boxes
   local im
+  local output
 
   local aboxes = {}
   for i=1,dataset.num_classes do
@@ -89,7 +90,7 @@ function Tester:test(iteration)
     boxes = dataset:getROIBoxes(i):float()
     im = dataset:getImage(i)
     timer3:reset()
-    local output = detec:detect(im,boxes)
+    output,boxes = detec:detect(im,boxes)
 
     local add_bg = 1
     local tt = 0 

@@ -14,9 +14,9 @@ function ImageDetect:detect(im,boxes)
   local inputs = feat_provider:getFeature(im,boxes)
 
   local output0 = feat_provider:compute(self.model, inputs)
-  local output = feat_provider:postProcess(im,boxes,output0)
+  local output,boxes_p = feat_provider:postProcess(im,boxes,output0)
   --self.sm:forward(output0)
 
   self.output,output = recursiveResizeAsCopyTyped(self.output,output,'torch.FloatTensor')
-  return self.output
+  return self.output,boxes_p
 end

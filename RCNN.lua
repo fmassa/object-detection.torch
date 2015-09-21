@@ -177,7 +177,7 @@ end
 
 -- don't do anything. could be the bbox regression or SVM, but I won't add it here
 function RCNN:postProcess(im,bbox,output)
-  return output
+  return output,bbox
 end
 
 function RCNN:compute(model,inputs)

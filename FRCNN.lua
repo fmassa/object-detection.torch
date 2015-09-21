@@ -164,7 +164,7 @@ end
 -- do the bbox regression
 function FRCNN:postProcess(im,boxes,output)
   -- not implemented yet
-  return output
+  return output,boxes
 end
 
 function FRCNN:compute(model, inputs)
