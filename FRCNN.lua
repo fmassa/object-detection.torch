@@ -168,7 +168,7 @@ function FRCNN:postProcess(im,boxes,output)
 end
 
 function FRCNN:compute(model, inputs)
-  local ttype = model.output:type()
+  local ttype = model.output:type() -- fix when doing bbox regression
   self.inputs,inputs = recursiveResizeAsCopyTyped(self.inputs,inputs,ttype)
   return model:forward(self.inputs)
 end
