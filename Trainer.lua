@@ -25,8 +25,10 @@ function Trainer:__init(module,criterion,batch_provider)
   
 end
 
-function Trainer:train()
-  
+function Trainer:train(maxIter)
+  local maxIter = maxIter or 20
+  local ttype = self.parameters:type()
+
   self.module:training()
 
   local module = self.module
@@ -37,8 +39,6 @@ function Trainer:train()
   local criterion = self.criterion
   local optimState = self.optimState
     
-  --local maxIter = inputs:size(1)
-  
   if self.confusion then
     self.confusion:zero()
   end
