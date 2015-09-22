@@ -39,14 +39,22 @@ local function nms(boxes, overlap)
     I = I[{{1,last-1}}]
     
     xx1:index(x1,1,I)
-    xx1:clamp(0,x1[i])
     yy1:index(y1,1,I)
-    yy1:clamp(0,y1[i])
     xx2:index(x2,1,I)
-    xx2:clamp(x2[i],math.huge)
     yy2:index(y2,1,I)
-    yy2:clamp(y2[i],math.huge)
-    
+
+    -- this code is wrong
+    -- xx1:clamp(0,x1[i])
+    -- yy1:clamp(0,y1[i])
+    -- xx2:clamp(x2[i],math.huge)
+    -- yy2:clamp(y2[i],math.huge)
+
+    -- this code is right
+    xx1:clamp(x1[i],math.huge)
+    yy1:clamp(y1[i],math.huge)
+    xx2:clamp(0,x2[i])
+    yy2:clamp(0,y2[i])
+
     w:resizeAs(xx2):zero()
     w:map2(xx2,xx1,function(xx,xxx2,xxx1) return math.max(xxx2-xxx1+1,0) end)
     h:resizeAs(yy2):zero()
