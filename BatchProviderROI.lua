@@ -2,7 +2,7 @@ local BatchProviderROI, parent = torch.class('nnf.BatchProviderROI','nnf.BatchPr
 
 function BatchProviderROI:__init(dataset)
   local fp = {dataset=dataset}
-  parent:__init(fp)
+  parent.__init(self, fp)
   self.imgs_per_batch = 2
   self.scale = 600
   self.max_size = 1000
