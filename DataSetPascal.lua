@@ -319,16 +319,11 @@ function DataSetPascal:attachProposals(i)
   local gt_boxes,gt_classes,valid_objects,anno = self:getGTBoxes(i)
 
   local all_boxes
-  if anno.object then
-    if #valid_objects > 0 and boxes:dim() > 0 then
-      all_boxes = torch.cat(gt_boxes,boxes,1)
-    elseif boxes:dim() == 0 then
-      all_boxes = gt_boxes
-    else
-      all_boxes = boxes
-    end
+  if gt_boxes:dim() > 0 and boxes:dim() > 0 then
+    all_boxes = torch.cat(gt_boxes,boxes,1)
+  elseif boxes:dim() == 0 then
+    all_boxes = gt_boxes
   else
-    gt_boxes = torch.IntTensor(0,4)
     all_boxes = boxes
   end
 
@@ -353,7 +348,7 @@ function DataSetPascal:attachProposals(i)
     local o = boxoverlap(all_boxes,gt_boxes[idx])
     local tmp = rec.overlap_class[{{},gt_classes[idx]}] -- pointer copy
     tmp[tmp:lt(o)] = o[tmp:lt(o)]
-    rec.overlap[{{},idx}] = boxoverlap(all_boxes,gt_boxes[idx])
+    rec.overlap[{{},idx}] = o
   end
   -- get max class overlap
   --rec.overlap,rec.label = rec.overlap:max(2)
