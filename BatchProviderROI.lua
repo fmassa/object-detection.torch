@@ -43,7 +43,7 @@ local initcheck = argcheck{
 }
 
 function BatchProviderROI:__init(...)
-  parent:__init()
+  parent.__init(self)
 
   local opts = initcheck(...)
   for k,v in pairs(opts) do self[k] = v end
