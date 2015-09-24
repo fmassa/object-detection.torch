@@ -1,6 +1,7 @@
 local matio = require 'matio'
 local argcheck = require 'argcheck'
 local xml = require 'xml'
+local concat = paths.dofile('utils.lua').concat
 
 matio.use_lua_strings = true
 
@@ -318,29 +319,14 @@ function DataSetPascal:attachProposals(i)
   local boxes = self:getROIBoxes(i)
   local gt_boxes,gt_classes,valid_objects,anno = self:getGTBoxes(i)
 
-  local all_boxes
-  if gt_boxes:dim() > 0 and boxes:dim() > 0 then
-    all_boxes = torch.cat(gt_boxes,boxes,1)
-  elseif boxes:dim() == 0 then
-    all_boxes = gt_boxes
-  else
-    all_boxes = boxes
-  end
+  local all_boxes = concat(gt_boxes,boxes,1)
 
   local num_boxes = boxes:dim() > 0 and boxes:size(1) or 0
   local num_gt_boxes = #gt_classes
   
   local rec = {}
-  if num_gt_boxes > 0 and num_boxes > 0 then
-  rec.gt = torch.cat(torch.ByteTensor(num_gt_boxes):fill(1),
-                     torch.ByteTensor(num_boxes):fill(0)    )
-  elseif num_boxes > 0 then
-    rec.gt = torch.ByteTensor(num_boxes):fill(0)
-  elseif num_gt_boxes > 0 then
-    rec.gt = torch.ByteTensor(num_gt_boxes):fill(1)
-  else
-    rec.gt = torch.ByteTensor(0)
-  end
+  rec.gt = concat(torch.ByteTensor(num_gt_boxes):fill(1),
+                  torch.ByteTensor(num_boxes):fill(0)    )
   
   rec.overlap_class = torch.FloatTensor(num_boxes+num_gt_boxes,self.num_classes):fill(0)
   rec.overlap = torch.FloatTensor(num_boxes+num_gt_boxes,num_gt_boxes):fill(0)
@@ -374,17 +360,9 @@ function DataSetPascal:attachProposals(i)
   end
   
   rec.boxes = all_boxes
-  if num_gt_boxes > 0 and num_boxes > 0 then
-  rec.class = torch.cat(torch.CharTensor(gt_classes),
-                        torch.CharTensor(num_boxes):fill(0))
-  elseif num_boxes > 0 then
-    rec.class = torch.CharTensor(num_boxes):fill(0)
-  elseif num_gt_boxes > 0 then
-    rec.class = torch.CharTensor(gt_classes)
-  else
-    rec.class = torch.CharTensor(0)
-  end
-  
+  rec.class = concat(torch.CharTensor(gt_classes),
+                     torch.CharTensor(num_boxes):fill(0))
+
   if self.save_objs then
     rec.objects = {}
     for _,idx in pairs(valid_objects) do

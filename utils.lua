@@ -46,6 +46,19 @@ local function recursiveResizeAsCopyTyped(t1,t2,type)
   return t1, t2
 end
 
+local function concat(t1,t2,dim)
+  local out
+  assert(t1:type() == t2:type(),'tensors should have the same type')
+  if t1:dim() > 0 and t2:dim() > 0 then
+    out = torch.cat(t1,t2,dim)
+  elseif t1:dim() > 0 then
+    out = t1:clone()
+  else
+    out = t2:clone()
+  end
+  return out
+end
+
 -- modify bbox input
 local function flipBoundingBoxes(bbox, im_width)
   if bbox:dim() == 1 then 
@@ -299,6 +312,7 @@ utils.reshapeLastLinearLayer = reshapeLastLinearLayer
 utils.sanitize = sanitize
 utils.recursiveResizeAsCopyTyped = recursiveResizeAsCopyTyped
 utils.flipBoundingBoxes = flipBoundingBoxes
+utils.concat = concat
 
 return utils
 
