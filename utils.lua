@@ -50,6 +50,7 @@ local function concat(t1,t2,dim)
   local out
   assert(t1:type() == t2:type(),'tensors should have the same type')
   if t1:dim() > 0 and t2:dim() > 0 then
+    dim = dim or t1:dim()
     out = torch.cat(t1,t2,dim)
   elseif t1:dim() > 0 then
     out = t1:clone()
