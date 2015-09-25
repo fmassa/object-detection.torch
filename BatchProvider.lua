@@ -169,8 +169,8 @@ function BatchProvider:prepareFeatures(im_idx,bboxes,fg_label,bg_label)
 
   -- compute the features
   local feats = self.feat_provider:getFeature(im_idx,s_boxes,flip)
-  local fg_data = feats:narrow(1,1,num_pos)
-  local bg_data = feats:narrow(1,num_pos+1,num_neg)
+  local fg_data = num_pos > 0 and feats:narrow(1,1,num_pos) or nil
+  local bg_data = num_neg > 0 and feats:narrow(1,num_pos+1,num_neg) or nil
 
   return fg_data, bg_data
 end
@@ -244,7 +244,9 @@ function BatchProvider:prepareBatch(batches,targets)
       batches[b][s]:copy(fg_data[j])
       targets[b][s]:copy(fg_label[j])
     end
+    collectgarbage()
   end
+  collectgarbage()
   return batches,targets
 end
 

@@ -118,16 +118,16 @@ function RCNN:getCrop(output,I,bbox)
   end -- padding > 0 || square
   ------
 
-  --local patch = image.crop(I,bbox[1],bbox[2],bbox[3],bbox[4]);
   local patch = I[{{},{bbox[2],bbox[4]},{bbox[1],bbox[3]}}]
-  local tmp = image.scale(patch,crop_width,crop_height,'bilinear');
+  self._crop = self._crop or torch.FloatTensor(3,self.crop_size,self.crop_size)
+  self._crop:resize(3,crop_height,crop_width)
+  image.scale(self._crop,patch,'bilinear');
+  local tmp = self._crop
 
   if image_mean then
-    tmp = tmp - image_mean[{{},{pad_h+1,pad_h+crop_height},
-                               {pad_w+1,pad_w+crop_width}}]
+    tmp:add(-1,image_mean[{{},{pad_h+1,pad_h+crop_height},
+                              {pad_w+1,pad_w+crop_width}}])
   end
-
-  --patch = torch.FloatTensor(3,crop_size,crop_size):zero()
 
   output[{{},{pad_h+1,pad_h+crop_height}, {pad_w+1,pad_w+crop_width}}] = tmp
 

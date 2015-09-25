@@ -168,7 +168,7 @@ function DataSetPascal:size()
 end
 
 function DataSetPascal:getImage(i)
-  return image.load(string.format(self.imgpath,self.img_ids[i]))
+  return image.load(string.format(self.imgpath,self.img_ids[i]),3,'float')
 end
 
 
