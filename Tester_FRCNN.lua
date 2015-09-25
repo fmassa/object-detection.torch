@@ -55,6 +55,29 @@ function Tester:validate(criterion)
   return err/num_batches
 end
 
+local function print_scores(dataset,res)
+  print('Results:')
+  -- print class names
+  io.write('|')
+  for i = 1, dataset.num_classes do
+    io.write(('%5s|'):format(dataset.classes[i]))
+  end
+  io.write('\n|')
+  -- print class scores
+  for i = 1, dataset.num_classes do
+    local l = #dataset.classes[i] < 5 and 5 or #dataset.classes[i]
+    local l = res[i] == res[i] and l-5 or l-3
+    if l > 0 then
+      io.write(('%.3f%'..l..'s|'):format(res[i],' '))
+    else
+      io.write(('%.3f|'):format(res[i]))
+    end
+  end
+  io.write('\n')
+  io.write(('mAP: %.4f\n'):format(res:mean(1)[1]))
+end
+
+
 function Tester:test(iteration)
   
   local dataset = self.dataset
@@ -77,7 +100,7 @@ function Tester:test(iteration)
   
   local max_per_set = 5*dataset:size()
   local max_per_image = 100
-  local thresh = torch.ones(dataset.num_classes):mul(-1.5)
+  local thresh = torch.ones(dataset.num_classes):mul(0.05)
   local scored_boxes = torch.FloatTensor()
   
   local timer = torch.Timer()
@@ -167,27 +190,4 @@ function Tester:test(iteration)
   dataset.roidb = nil
   return res
 end
-
-local function print_scores(dataset,res)
-  print('Results:')
-  -- print class names
-  io.write('|')
-  for i = 1, dataset.num_classes do
-    io.write(('%5s|'):format(dataset.classes[i]))
-  end
-  io.write('\n|')
-  -- print class scores
-  for i = 1, dataset.num_classes do
-    local l = #dataset.classes[i] < 5 and 5 or #dataset.classes[i]
-    local l = res[i] == res[i] and l-5 or l-3
-    if l > 0 then
-      io.write(('%.3f%'..l..'s|'):format(res[i],' '))
-    else
-      io.write(('%.3f|'):format(res[i]))
-    end
-  end
-  io.write('\n')
-  io.write(('mAP: %.4f\n'):format(res:mean(1)[1]))
-end
-
 

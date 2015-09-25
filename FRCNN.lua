@@ -5,6 +5,7 @@ local FRCNN = torch.class('nnf.FRCNN')
 local argcheck = require 'argcheck'
 local initcheck = argcheck{
   pack=true,
+  noordered=true,
   {name="scale",
    type="table",
    default={600},

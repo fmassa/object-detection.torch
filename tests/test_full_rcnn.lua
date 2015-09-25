@@ -13,16 +13,19 @@ local image_transformer= nnf.ImageTransformer{mean_pix={102.9801,115.9465,122.77
                                               raw_scale = 255,
                                               swap = {3,2,1}}
 
-fp = nnf.FRCNN{image_transformer=image_transformer}
+fp = nnf.RCNN{image_transformer=image_transformer,
+              crop_size=224}
 fp:training()
 --------------------------------------------------------------------------------
 -- define batch providers
 --------------------------------------------------------------------------------
 
-bp = nnf.BatchProviderROI{dataset=ds,feat_provider=fp,
-                          bg_threshold={0.1,0.5}
-                         }
---bp:setupData()
+bp = nnf.BatchProvider{dataset=ds,feat_provider=fp,
+                       bg_threshold={0.0,0.5},
+                       nTimesMoreData=2,
+                       iter_per_batch=100,
+                      }
+bp:setupData()
 
 --------------------------------------------------------------------------------
 -- define model
@@ -66,21 +69,18 @@ do
     linear.bias:zero()
     classifier:add(linear)
   collectgarbage()
-  local prl = nn.ParallelTable()
-  prl:add(features)
-  prl:add(nn.Identity())
-  model:add(prl)
+  --local prl = nn.ParallelTable()
+  --prl:add(features)
+  --prl:add(nn.Identity())
+  --model:add(prl)
   --model:add(nnf.ROIPooling(6,6):setSpatialScale(1/16))
-  model:add(inn.ROIPooling(6,6):setSpatialScale(1/16))
+  --model:add(inn.ROIPooling(6,6):setSpatialScale(1/16))
+  model:add(features)
+  model:add(nn.SpatialAdaptiveMaxPooling(6,6))
   model:add(nn.View(-1):setNumInputDims(3))
   model:add(classifier)
 end
 model:cuda()
-model = nil
-collectgarbage()
-model = torch.load('test_model.t7')
-model:cuda()
-collectgarbage()
 --------------------------------------------------------------------------------
 -- train
 --------------------------------------------------------------------------------
@@ -89,11 +89,11 @@ criterion = nn.CrossEntropyCriterion():cuda()
 
 trainer = nnf.Trainer(model,criterion,bp)
 
-for i=1,0 do
+for i=1,400 do
   if i == 300 then
     trainer.optimState.learningRate = trainer.optimState.learningRate/10
   end
-  xlua.progress(i,400)
+  print(('Iteration %3d/%-3d'):format(i,400))
   trainer:train(100)
 end
 
@@ -110,9 +110,10 @@ dsv = nnf.DataSetPascal{image_set='test',
                          }
 
 
-fpv = nnf.FRCNN{image_transformer=image_transformer}
+fpv = nnf.RCNN{image_transformer=image_transformer,
+               crop_size=224}
 fpv:evaluate()
-exp_name = 'test1_frcnn'
+exp_name = 'test1_rcnn'
 
 tester = nnf.Tester_FRCNN(model,fpv,dsv)
 tester.cachefolder = 'cachedir/'..exp_name
