@@ -4,6 +4,7 @@ local flipBoundingBoxes = paths.dofile('utils.lua').flipBoundingBoxes
 local argcheck = require 'argcheck'
 local initcheck = argcheck{
   pack=true,
+  noordered=true,
   {name="crop_size",
    type="number",
    default=227,
