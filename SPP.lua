@@ -5,8 +5,8 @@ local SPP = torch.class('nnf.SPP')
 
 -- argcheck crashes with that many arguments, and using unordered
 -- doesn't seems practical
---[[
-local argcheck = require 'argcheck'
+-- [[
+local argcheck = paths.dofile('argcheck.lua')--require 'argcheck'
 local initcheck = argcheck{
   pack=true,
   {name="model",
@@ -69,18 +69,18 @@ function SPP:__init(...)
   self.dataset = dataset
   self.model = model
 
-  --local opts = initcheck(...)
-  --for k,v in pairs(opts) do self[k] = v end
+  local opts = initcheck(...)
+  for k,v in pairs(opts) do self[k] = v end
 
-  self.num_feat_chns = 256
-  self.pooling_scales = {{1,1},{2,2},{3,3},{6,6}}
+  --self.num_feat_chns = 256
+  --self.pooling_scales = {{1,1},{2,2},{3,3},{6,6}}
   local pyr = torch.Tensor(self.pooling_scales):t()
   local pooled_size = pyr[1]:dot(pyr[2])
   self.output_size = {self.num_feat_chns*pooled_size}
 
   --self.spp_pooler = inn.SpatialPyramidPooling(self.pooling_scales):float()
-  self.image_transformer = nnf.ImageTransformer{}
--- [[
+  --self.image_transformer = nnf.ImageTransformer{}
+--[[
 -- paper=864, their code=874 
   self.scales = {480,576,688,874,1200} -- 874
   
