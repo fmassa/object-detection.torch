@@ -1,5 +1,5 @@
 local matio = require 'matio'
-local argcheck = require 'argcheck'
+local argcheck = dofile'argcheck.lua'--require 'argcheck'
 local xml = require 'xml'
 local concat = paths.dofile('utils.lua').concat
 
@@ -60,6 +60,7 @@ local initcheck = argcheck{
         if type(v) ~= 'string' then
           print('classes can only be of string input');
           out = false
+          break
         end
       end
       return out
@@ -310,6 +311,35 @@ function DataSetPascal:getGTBoxes(i)
  
 end
 
+function DataSetPascal:bestOverlap(all_boxes, gt_boxes, gt_classes)
+  local num_total_boxes = all_boxes:size(1)
+  local num_gt_boxes = #gt_boxes
+  local overlap_class = torch.FloatTensor(num_total_boxes,self.num_classes):zero()
+  local overlap = torch.FloatTensor(num_total_boxes,num_gt_boxes):zero()
+  for idx=1,num_gt_boxes do
+    local o = boxoverlap(all_boxes,gt_boxes[idx])
+    local tmp = overlap_class[{{},gt_classes[idx]}] -- pointer copy
+    tmp[tmp:lt(o)] = o[tmp:lt(o)]
+    overlap[{{},idx}] = o
+  end
+  -- get max class overlap
+  --rec.overlap,rec.label = rec.overlap:max(2)
+  --rec.overlap = torch.squeeze(rec.overlap,2)
+  --rec.label   = torch.squeeze(rec.label,2)
+  --rec.label[rec.overlap:eq(0)] = 0
+  local correspondance
+  if num_gt_boxes > 0 then
+    overlap,correspondance = overlap:max(2)
+    overlap = torch.squeeze(overlap,2)
+    correspondance   = torch.squeeze(correspondance,2)
+    correspondance[overlap:eq(0)] = 0
+  else
+    overlap = torch.FloatTensor(num_total_boxes):zero()
+    correspondance = torch.LongTensor(num_total_boxes):zero()
+  end
+  return overlap, correspondance, overlap_class
+end
+
 function DataSetPascal:attachProposals(i)
 
   if not self.roidb then
@@ -328,34 +358,13 @@ function DataSetPascal:attachProposals(i)
   rec.gt = concat(torch.ByteTensor(num_gt_boxes):fill(1),
                   torch.ByteTensor(num_boxes):fill(0)    )
   
-  rec.overlap_class = torch.FloatTensor(num_boxes+num_gt_boxes,self.num_classes):fill(0)
-  rec.overlap = torch.FloatTensor(num_boxes+num_gt_boxes,num_gt_boxes):fill(0)
-  for idx=1,num_gt_boxes do
-    local o = boxoverlap(all_boxes,gt_boxes[idx])
-    local tmp = rec.overlap_class[{{},gt_classes[idx]}] -- pointer copy
-    tmp[tmp:lt(o)] = o[tmp:lt(o)]
-    rec.overlap[{{},idx}] = o
-  end
-  -- get max class overlap
-  --rec.overlap,rec.label = rec.overlap:max(2)
-  --rec.overlap = torch.squeeze(rec.overlap,2)
-  --rec.label   = torch.squeeze(rec.label,2)
-  --rec.label[rec.overlap:eq(0)] = 0
-  
-  if num_gt_boxes > 0 then
-    rec.overlap,rec.correspondance = rec.overlap:max(2)
-    rec.overlap = torch.squeeze(rec.overlap,2)
-    rec.correspondance   = torch.squeeze(rec.correspondance,2)
-    rec.correspondance[rec.overlap:eq(0)] = 0
-  else
-    rec.overlap = torch.FloatTensor(num_boxes+num_gt_boxes):fill(0)
-    rec.correspondance = torch.LongTensor(num_boxes+num_gt_boxes):fill(0)
-  end
+  rec.overlap, rec.correspondance, rec.overlap_class =
+                    self:bestOverlap(all_boxes,gt_boxes,gt_classes)
   rec.label = torch.IntTensor(num_boxes+num_gt_boxes):fill(0)
   for idx=1,(num_boxes+num_gt_boxes) do
     local corr = rec.correspondance[idx]
     if corr > 0 then
-      rec.label[idx] = self.class_to_id[anno.object[valid_objects[corr] ].name]
+      rec.label[idx] = gt_classes[corr]
     end
   end
   
@@ -368,8 +377,6 @@ function DataSetPascal:attachProposals(i)
     for _,idx in pairs(valid_objects) do
       table.insert(rec.objects,anno.object[idx])
     end
-  else
-    rec.correspondance = nil
   end
   
   function rec:size()
