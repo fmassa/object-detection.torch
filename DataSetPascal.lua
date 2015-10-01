@@ -313,7 +313,7 @@ end
 
 function DataSetPascal:bestOverlap(all_boxes, gt_boxes, gt_classes)
   local num_total_boxes = all_boxes:size(1)
-  local num_gt_boxes = #gt_boxes
+  local num_gt_boxes = gt_boxes:dim() > 0 and gt_boxes:size(1) or 0
   local overlap_class = torch.FloatTensor(num_total_boxes,self.num_classes):zero()
   local overlap = torch.FloatTensor(num_total_boxes,num_gt_boxes):zero()
   for idx=1,num_gt_boxes do
@@ -392,10 +392,11 @@ function DataSetPascal:createROIs()
   end
   self.rois = {}
   for i=1,self.num_imgs do
-    xlua.progress(i,self.num_imgs)
     table.insert(self.rois,self:attachProposals(i))
     if i%500 == 0 then
+      xlua.progress(i,self.num_imgs)
       collectgarbage()
     end
   end
+  xlua.progress(self.num_imgs,self.num_imgs)
 end

@@ -19,7 +19,7 @@ torch.include('nnf','ROIPooling.lua')
 
 torch.include('nnf','Trainer.lua')
 torch.include('nnf','Tester.lua')
-torch.include('nnf','Tester_FRCNN.lua')
+--torch.include('nnf','Tester_FRCNN.lua')
 
 torch.include('nnf','SVMTrainer.lua')
 

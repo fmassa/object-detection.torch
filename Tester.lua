@@ -4,7 +4,7 @@ local nms = paths.dofile('nms.lua')
 local keep_top_k = utils.keep_top_k
 local VOCevaldet = utils.VOCevaldet
 
-local Tester = torch.class('nnf.Tester_FRCNN')
+local Tester = torch.class('nnf.Tester')
 
 function Tester:__init(module,feat_provider,dataset)
   self.dataset = dataset
@@ -107,11 +107,21 @@ function Tester:test(iteration)
   local timer2 = torch.Timer()
   local timer3 = torch.Timer()
 
+  -- SPP is more efficient if we cache the features. We treat it differently then
+  -- the other feature providers
+  local pass_index = torch.type(feat_provider) == 'nnf.SPP' and true or false
+
   for i=1,dataset:size() do
     timer:reset()
     io.write(('test: (%s) %5d/%-5d '):format(dataset.dataset_name,i,dataset:size()));
+
+    if pass_index then
+      im = i
+    else
+      im = dataset:getImage(i)
+    end
     boxes = dataset:getROIBoxes(i):float()
-    im = dataset:getImage(i)
+
     timer3:reset()
     output,boxes = detec:detect(im,boxes)
 
