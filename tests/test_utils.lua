@@ -40,9 +40,9 @@ ds = getDS()
 
 model1, model, features, classifier = getModel()
   
-fp1 = nnf.RCNN()
-fp2 = nnf.FRCNN()
-fp3 = nnf.SPP(features)
+fp1 = nnf.RCNN{}
+fp2 = nnf.FRCNN{}
+fp3 = nnf.SPP{model=features}
 fp3.use_cache = false
 fp3:evaluate()
 
