@@ -7,7 +7,10 @@ nnf = {}
 
 torch.include('nnf','ImageTransformer.lua')
 
+torch.include('nnf','DataSetDetection.lua')
 torch.include('nnf','DataSetPascal.lua')
+torch.include('nnf','DataSetCOCO.lua')
+
 torch.include('nnf','BatchProviderBase.lua')
 torch.include('nnf','BatchProvider.lua')
 torch.include('nnf','BatchProviderROI.lua')

@@ -124,7 +124,6 @@ end
 --------------------------------------------------------------------------------
 
 local function boxoverlap(a,b)
-  --local b = anno.objects[j]
   local b = b.xmin and {b.xmin,b.ymin,b.xmax,b.ymax} or b
     
   local x1 = a:select(2,1):clone()
@@ -314,6 +313,7 @@ utils.sanitize = sanitize
 utils.recursiveResizeAsCopyTyped = recursiveResizeAsCopyTyped
 utils.flipBoundingBoxes = flipBoundingBoxes
 utils.concat = concat
+utils.boxoverlap = boxoverlap
 
 return utils
 

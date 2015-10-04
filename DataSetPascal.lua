@@ -1,11 +1,13 @@
 local matio = require 'matio'
 local argcheck = dofile'argcheck.lua'--require 'argcheck'
 local xml = require 'xml'
-local concat = paths.dofile('utils.lua').concat
+local utilities = paths.dofile('utils.lua')
+local concat = utilities.concat
+local boxoverlap = utilities.boxoverlap
 
 matio.use_lua_strings = true
 
-local DataSetPascal = torch.class('nnf.DataSetPascal')
+local DataSetPascal,parent = torch.class('nnf.DataSetPascal', 'nnf.DataSetDetection')
 
 local function lines_from(file)
 -- get all lines from a file, returns an empty 
@@ -104,7 +106,7 @@ local initcheck = argcheck{
 }
 
 function DataSetPascal:__init(...)
-  
+  parent.__init(self)
   local args = initcheck(...)
   print(args)
   for k,v in pairs(args) do self[k] = v end
@@ -249,34 +251,6 @@ function DataSetPascal:getROIBoxes(i)
   return self.roidb[i]--self.roidb[self.img2roidb[self.img_ids[i] ] ]
 end
 
-local function boxoverlap(a,b)
-  local b = b.xmin and {b.xmin,b.ymin,b.xmax,b.ymax} or b
-    
-  local x1 = a:select(2,1):clone()
-  x1[x1:lt(b[1])] = b[1] 
-  local y1 = a:select(2,2):clone()
-  y1[y1:lt(b[2])] = b[2]
-  local x2 = a:select(2,3):clone()
-  x2[x2:gt(b[3])] = b[3]
-  local y2 = a:select(2,4):clone()
-  y2[y2:gt(b[4])] = b[4]
-  
-  local w = x2-x1+1;
-  local h = y2-y1+1;
-  local inter = torch.cmul(w,h):float()
-  local aarea = torch.cmul((a:select(2,3)-a:select(2,1)+1) ,
-                           (a:select(2,4)-a:select(2,2)+1)):float()
-  local barea = (b[3]-b[1]+1) * (b[4]-b[2]+1);
-  
-  -- intersection over union overlap
-  local o = torch.cdiv(inter , (aarea+barea-inter))
-  -- set invalid entries to 0 overlap
-  o[w:lt(0)] = 0
-  o[h:lt(0)] = 0
-  
-  return o
-end
-
 function DataSetPascal:getGTBoxes(i)
   local anno = self:getAnnotation(i)
   local valid_objects = {}
@@ -309,81 +283,6 @@ function DataSetPascal:getGTBoxes(i)
 
   return gt_boxes,gt_classes,valid_objects,anno
  
-end
-
-function DataSetPascal:bestOverlap(all_boxes, gt_boxes, gt_classes)
-  local num_total_boxes = all_boxes:size(1)
-  local num_gt_boxes = gt_boxes:dim() > 0 and gt_boxes:size(1) or 0
-  local overlap_class = torch.FloatTensor(num_total_boxes,self.num_classes):zero()
-  local overlap = torch.FloatTensor(num_total_boxes,num_gt_boxes):zero()
-  for idx=1,num_gt_boxes do
-    local o = boxoverlap(all_boxes,gt_boxes[idx])
-    local tmp = overlap_class[{{},gt_classes[idx]}] -- pointer copy
-    tmp[tmp:lt(o)] = o[tmp:lt(o)]
-    overlap[{{},idx}] = o
-  end
-  -- get max class overlap
-  --rec.overlap,rec.label = rec.overlap:max(2)
-  --rec.overlap = torch.squeeze(rec.overlap,2)
-  --rec.label   = torch.squeeze(rec.label,2)
-  --rec.label[rec.overlap:eq(0)] = 0
-  local correspondance
-  if num_gt_boxes > 0 then
-    overlap,correspondance = overlap:max(2)
-    overlap = torch.squeeze(overlap,2)
-    correspondance   = torch.squeeze(correspondance,2)
-    correspondance[overlap:eq(0)] = 0
-  else
-    overlap = torch.FloatTensor(num_total_boxes):zero()
-    correspondance = torch.LongTensor(num_total_boxes):zero()
-  end
-  return overlap, correspondance, overlap_class
-end
-
-function DataSetPascal:attachProposals(i)
-
-  if not self.roidb then
-    self:loadROIDB()
-  end
-
-  local boxes = self:getROIBoxes(i)
-  local gt_boxes,gt_classes,valid_objects,anno = self:getGTBoxes(i)
-
-  local all_boxes = concat(gt_boxes,boxes,1)
-
-  local num_boxes = boxes:dim() > 0 and boxes:size(1) or 0
-  local num_gt_boxes = #gt_classes
-  
-  local rec = {}
-  rec.gt = concat(torch.ByteTensor(num_gt_boxes):fill(1),
-                  torch.ByteTensor(num_boxes):fill(0)    )
-  
-  rec.overlap, rec.correspondance, rec.overlap_class =
-                    self:bestOverlap(all_boxes,gt_boxes,gt_classes)
-  rec.label = torch.IntTensor(num_boxes+num_gt_boxes):fill(0)
-  for idx=1,(num_boxes+num_gt_boxes) do
-    local corr = rec.correspondance[idx]
-    if corr > 0 then
-      rec.label[idx] = gt_classes[corr]
-    end
-  end
-  
-  rec.boxes = all_boxes
-  rec.class = concat(torch.CharTensor(gt_classes),
-                     torch.CharTensor(num_boxes):fill(0))
-
-  if self.save_objs then
-    rec.objects = {}
-    for _,idx in pairs(valid_objects) do
-      table.insert(rec.objects,anno.object[idx])
-    end
-  end
-  
-  function rec:size()
-    return (num_boxes+num_gt_boxes)
-  end
-  
-  return rec
 end
 
 function DataSetPascal:createROIs()
