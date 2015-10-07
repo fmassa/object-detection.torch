@@ -1,6 +1,7 @@
 local flipBoundingBoxes = paths.dofile('utils.lua').flipBoundingBoxes
 local recursiveResizeAsCopyTyped = paths.dofile('utils.lua').recursiveResizeAsCopyTyped
 local FRCNN = torch.class('nnf.FRCNN')
+FRCNN._isFeatureProvider = true
 
 local argcheck = require 'argcheck'
 local initcheck = argcheck{

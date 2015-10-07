@@ -6,7 +6,7 @@ local recursiveResizeAsCopyTyped = utils.recursiveResizeAsCopyTyped
 
 local Trainer = torch.class('nnf.Trainer')
 
-function Trainer:__init(module,criterion,batch_provider)
+function Trainer:__init(module,criterion,batch_provider,optimState)
   
   self.module = module
   self.criterion = criterion
@@ -14,7 +14,8 @@ function Trainer:__init(module,criterion,batch_provider)
   
   self.parameters,self.gradParameters = self.module:getParameters()
   
-  self.optimState = {learningRate = 1e-3, weightDecay = 0.0005, momentum = 0.9,
+  self.optimState = optimState or
+                    {learningRate = 1e-3, weightDecay = 0.0005, momentum = 0.9,
                      learningRateDecay = 0, dampening = 0}
                      
   self.epoch = 0

@@ -3,6 +3,7 @@ local concat = utilities.concat
 local boxoverlap = utilities.boxoverlap
 
 local DataSetDetection = torch.class('nnf.DataSetDetection')
+DataSetDetection._isDataSet = true
 
 function DataSetDetection:__init()
   self.classes = nil

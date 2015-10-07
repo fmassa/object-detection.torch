@@ -1,16 +1,32 @@
 local BatchProvider,parent = 
                     torch.class('nnf.BatchProvider','nnf.BatchProviderBase')
 
+
 local argcheck = require 'argcheck'
+
+local env = require 'argcheck.env' -- retrieve argcheck environement
+-- this is the default type function
+-- which can be overrided by the user
+function env.istype(obj, typename)
+  if typename == 'DataSet' then
+    return obj._isDataSet
+  end
+  if typename == 'FeatureProvider' then
+    return obj._isFeatureProvider
+  end
+  return torch.type(obj) == typename
+end
+
+
 local initcheck = argcheck{
   pack=true,
   noordered=true,
   {name="dataset",
-   type="nnf.DataSetPascal",
+   type="DataSet",
    help="A dataset class" 
   },
   {name="feat_provider",
-   type="nnf.RCNN",
+   type="FeatureProvider",
    help="A feat provider class"
   },
   {name="batch_size",

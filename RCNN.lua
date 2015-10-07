@@ -33,6 +33,7 @@ local initcheck = argcheck{
 
 
 local RCNN = torch.class('nnf.RCNN')
+RCNN._isFeatureProvider = true
 
 function RCNN:__init(...)
 --  self.image_transformer = nnf.ImageTransformer{

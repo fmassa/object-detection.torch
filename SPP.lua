@@ -2,6 +2,7 @@ local hdf5 = require 'hdf5'
 local flipBoundingBoxes = paths.dofile('utils.lua').flipBoundingBoxes
 
 local SPP = torch.class('nnf.SPP')
+SPP._isFeatureProvider = true
 
 -- argcheck crashes with that many arguments, and using unordered
 -- doesn't seems practical
