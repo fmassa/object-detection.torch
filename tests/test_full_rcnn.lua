@@ -115,6 +115,6 @@ fpv = nnf.RCNN{image_transformer=image_transformer,
 fpv:evaluate()
 exp_name = 'test1_rcnn'
 
-tester = nnf.Tester_FRCNN(model,fpv,dsv)
+tester = nnf.Tester(model,fpv,dsv)
 tester.cachefolder = 'cachedir/'..exp_name
 tester:test(40000)

@@ -22,7 +22,7 @@ fp:training()
 bp = nnf.BatchProviderROI{dataset=ds,feat_provider=fp,
                           bg_threshold={0.1,0.5}
                          }
---bp:setupData()
+bp:setupData()
 
 --------------------------------------------------------------------------------
 -- define model
@@ -76,10 +76,11 @@ do
   model:add(classifier)
 end
 model:cuda()
-model = nil
-collectgarbage()
-model = torch.load('test_model.t7')
-model:cuda()
+
+--model = nil
+--collectgarbage()
+--model = torch.load('test_model.t7')
+--model:cuda()
 collectgarbage()
 --------------------------------------------------------------------------------
 -- train
@@ -89,12 +90,14 @@ criterion = nn.CrossEntropyCriterion():cuda()
 
 trainer = nnf.Trainer(model,criterion,bp)
 
-for i=1,0 do
+savedModel = model:clone('weight','bias','running_mean','running_std')
+for i=1,400 do
   if i == 300 then
     trainer.optimState.learningRate = trainer.optimState.learningRate/10
   end
-  xlua.progress(i,400)
+  print(('Iteration %3d/%-3d'):format(i,400))
   trainer:train(100)
+  print(('  Train error: %g'):format(trainer.fx[i]))
 end
 
 --------------------------------------------------------------------------------
@@ -112,8 +115,10 @@ dsv = nnf.DataSetPascal{image_set='test',
 
 fpv = nnf.FRCNN{image_transformer=image_transformer}
 fpv:evaluate()
-exp_name = 'test1_frcnn'
+exp_name = 'test2_frcnn'
 
-tester = nnf.Tester_FRCNN(model,fpv,dsv)
+tester = nnf.Tester(model,fpv,dsv)
 tester.cachefolder = 'cachedir/'..exp_name
 tester:test(40000)
+
+torch.save(paths.concat(tester.cachefolder,'model.t7'),savedModel)
