@@ -6,11 +6,14 @@ local VOCevaldet = utils.VOCevaldet
 
 local Tester = torch.class('nnf.Tester')
 
-function Tester:__init(module,feat_provider,dataset)
-  self.dataset = dataset
-  self.feat_provider = feat_provider
+function Tester:__init(module,feat_provider)
+  self.dataset = feat_provider.dataset
   self.module = module
+  self.feat_provider = feat_provider
 
+  self.feat_dim = {256*50}
+  self.max_batch_size = 4000
+  
   self.cachefolder = nil
   self.cachename = nil
   self.suffix = ''
@@ -55,7 +58,133 @@ function Tester:validate(criterion)
   return err/num_batches
 end
 
-local function print_scores(dataset,res)
+function Tester:test(iteration)
+  
+  local dataset = self.dataset
+  local module = self.module
+  local feat_provider = self.feat_provider
+
+  local pathfolder = paths.concat(self.cachefolder,'test_iter'..iteration)
+  paths.mkdir(pathfolder)  
+
+  module:evaluate()
+  dataset:loadROIDB()
+  
+  local feats = torch.FloatTensor()
+  local feats_batched = {}
+  local feats_cuda = torch.CudaTensor()
+  
+  local output = torch.FloatTensor()
+  
+  local output_dim = module:get(module:size())
+  
+  local softmax = nn.SoftMax():float()
+  
+  local boxes
+  -- 
+  local aboxes = {}
+  for i=1,dataset.num_classes do
+    table.insert(aboxes,{})
+  end
+  
+  local max_per_set = 5*dataset:size()
+  local max_per_image = 100
+  local thresh = torch.ones(dataset.num_classes):mul(-1.5)
+  local scored_boxes = torch.FloatTensor()
+  
+  local timer = torch.Timer()
+  local timer2 = torch.Timer()
+  local timer3 = torch.Timer()
+  
+  for i=1,dataset:size() do
+    timer:reset()
+    io.write(('test: (%s) %5d/%-5d '):format(dataset.dataset_name,i,dataset:size()));
+    boxes = dataset:getROIBoxes(i):float()
+    local num_boxes = boxes:size(1)
+    -- compute image feature maps
+    timer3:reset()
+    feats:resize(num_boxes,unpack(self.feat_dim))
+    for idx=1,num_boxes do
+      feats[idx] = feat_provider:getFeature(i,boxes[idx])
+    end
+    local tt = timer3:time().real
+    -- compute classification scores
+    torch.split(feats_batched,feats,self.max_batch_size,1)
+    timer3:reset()
+    for idx,f in ipairs(feats_batched) do
+      local fs = f:size(1)
+      feats_cuda:resize(fs,unpack(self.feat_dim)):copy(f)
+      module:forward(feats_cuda)
+      if idx == 1 then
+        local out_size = module.output:size():totable()
+        table.remove(out_size,1)
+        output:resize(num_boxes,unpack(out_size))
+      end
+      output:narrow(1,(idx-1)*self.max_batch_size+1,fs):copy(module.output)
+    end
+    local add_bg = 0
+    if dataset.num_classes ~= output:size(2) then -- if there is no svm
+      output = softmax:forward(output) 
+      add_bg = 1
+    end
+    
+    local tt2 = timer3:time().real
+    
+    timer2:reset()
+    for j=1,dataset.num_classes do
+      local scores = output:select(2,j+add_bg)
+      local idx = torch.range(1,scores:numel()):long()
+      local idx2 = scores:gt(thresh[j])
+      idx = idx[idx2]
+      scored_boxes:resize(idx:numel(),5)
+      if scored_boxes:numel() > 0 then
+        scored_boxes:narrow(2,1,4):index(boxes,1,idx)
+        scored_boxes:select(2,5):copy(scores[idx2])
+      end
+      local keep = nms(scored_boxes,0.3)
+      if keep:numel()>0 then
+        local _,ord = torch.sort(scored_boxes:select(2,5):index(1,keep),true)
+        ord = ord:narrow(1,1,math.min(ord:numel(),max_per_image))
+        keep = keep:index(1,ord)
+        aboxes[j][i] = scored_boxes:index(1,keep)
+      else
+        aboxes[j][i] = torch.FloatTensor()
+      end
+      
+      if i%1000 == 0 then
+        aboxes[j],thresh[j] = keep_top_k(aboxes[j],max_per_set)
+      end
+      
+    end
+
+    io.write((' prepare feat time: %.3f, forward time: %.3f, select time: %.3fs, total time: %.3fs\n'):format(tt,tt2,timer2:time().real,timer:time().real));
+    --collectgarbage()
+    --mattorch.save(paths.concat(pathfolder,dataset.img_ids[i]..'.mat'),output:double())
+  end
+
+  for i = 1,dataset.num_classes do
+    -- go back through and prune out detections below the found threshold
+    for j = 1,dataset:size() do
+      if aboxes[i][j]:numel() > 0 then
+        local I = aboxes[i][j]:select(2,5):lt(thresh[i])
+        local idx = torch.range(1,aboxes[i][j]:size(1)):long()
+        idx = idx[I]
+        if idx:numel()>0 then
+          aboxes[i][j] = aboxes[i][j]:index(1,idx)
+        end
+      end
+    end
+    save_file = paths.concat(pathfolder, dataset.classes[i].. '_boxes_'.. 
+                             dataset.dataset_name..self.suffix)
+    torch.save(save_file, aboxes)
+  end
+
+  local res = {}
+  for i=1,dataset.num_classes do
+    local cls = dataset.classes[i]
+    res[i] = VOCevaldet(dataset,aboxes[i],cls)
+  end
+  res = torch.Tensor(res)
   print('Results:')
   -- print class names
   io.write('|')
@@ -75,129 +204,8 @@ local function print_scores(dataset,res)
   end
   io.write('\n')
   io.write(('mAP: %.4f\n'):format(res:mean(1)[1]))
-end
-
-
-function Tester:test(iteration)
-  
-  local dataset = self.dataset
-  local module = self.module
-  local feat_provider = self.feat_provider
-
-  module:evaluate()
-  feat_provider:evaluate()
-  dataset:loadROIDB()
-  
-  local detec = nnf.ImageDetect(module, feat_provider)
-  local boxes
-  local im
-  local output
-
-  local aboxes = {}
-  for i=1,dataset.num_classes do
-    table.insert(aboxes,{})
-  end
-  
-  local max_per_set = 5*dataset:size()
-  local max_per_image = 100
-  local thresh = torch.ones(dataset.num_classes):mul(0.05)
-  local scored_boxes = torch.FloatTensor()
-  
-  local timer = torch.Timer()
-  local timer2 = torch.Timer()
-  local timer3 = torch.Timer()
-
-  -- SPP is more efficient if we cache the features. We treat it differently then
-  -- the other feature providers
-  local pass_index = torch.type(feat_provider) == 'nnf.SPP' and true or false
-
-  for i=1,dataset:size() do
-    timer:reset()
-    io.write(('test: (%s) %5d/%-5d '):format(dataset.dataset_name,i,dataset:size()));
-
-    if pass_index then
-      im = i
-    else
-      im = dataset:getImage(i)
-    end
-    boxes = dataset:getROIBoxes(i):float()
-
-    timer3:reset()
-    output,boxes = detec:detect(im,boxes)
-
-    local add_bg = 1
-    local tt = 0 
-    local tt2 = timer3:time().real
-    
-    timer2:reset()
-    -- do a NMS for each class, based on the scores from the classifier
-    for j=1,dataset.num_classes do
-      local scores = output:select(2,j+add_bg)
-      -- only select detections with a score greater than thresh
-      -- this avoid doing NMS on too many bboxes with low score
-      local idx = torch.range(1,scores:numel()):long()
-      local idx2 = scores:gt(thresh[j])
-      idx = idx[idx2]
-      scored_boxes:resize(idx:numel(),5)
-      if scored_boxes:numel() > 0 then
-        scored_boxes:narrow(2,1,4):index(boxes,1,idx)
-        scored_boxes:select(2,5):copy(scores[idx2])
-      end
-      local keep = nms(scored_boxes,0.3)
-      if keep:numel()>0 then
-        local _,ord = torch.sort(scored_boxes:select(2,5):index(1,keep),true)
-        ord = ord:narrow(1,1,math.min(ord:numel(),max_per_image))
-        keep = keep:index(1,ord)
-        aboxes[j][i] = scored_boxes:index(1,keep)
-      else
-        aboxes[j][i] = torch.FloatTensor()
-      end
-      
-      -- remove low scoring boxes and update threshold
-      if i%1000 == 0 then
-        aboxes[j],thresh[j] = keep_top_k(aboxes[j],max_per_set)
-      end
-      
-    end
-
-    io.write((' prepare feat time: %.3f, forward time: %.3f, select time: %.3fs, total time: %.3fs\n'):format(tt,tt2,timer2:time().real,timer:time().real));
-  end
-
-  local pathfolder = paths.concat(self.cachefolder,'test_iter'..iteration)
-  paths.mkdir(pathfolder)
-
-  for i = 1,dataset.num_classes do
-    -- go back through and prune out detections below the found threshold
-    for j = 1,dataset:size() do
-      if aboxes[i][j]:numel() > 0 then
-        local I = aboxes[i][j]:select(2,5):lt(thresh[i])
-        local idx = torch.range(1,aboxes[i][j]:size(1)):long()
-        idx = idx[I]
-        if idx:numel()>0 then
-          aboxes[i][j] = aboxes[i][j]:index(1,idx)
-        end
-      end
-    end
-    --save_file = paths.concat(pathfolder, dataset.classes[i].. '_boxes_'..
-    --                         dataset.dataset_name..self.suffix)
-    --torch.save(save_file, aboxes)
-  end
-  save_file = paths.concat(pathfolder, 'boxes_'..
-                           dataset.dataset_name..self.suffix)
-  torch.save(save_file, aboxes)
-
-
-  local res = {}
-  for i=1,dataset.num_classes do
-    local cls = dataset.classes[i]
-    res[i] = VOCevaldet(dataset,aboxes[i],cls)
-  end
-  res = torch.Tensor(res)
-
-  print_scores(dataset,res)
 
   -- clean roidb to free memory
   dataset.roidb = nil
   return res
 end
-

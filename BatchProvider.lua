@@ -1,108 +1,81 @@
-local BatchProvider = torch.class('nnf.BatchProvider')
+local BatchProvider,parent = 
+                    torch.class('nnf.BatchProvider','nnf.BatchProviderBase')
 
-local function createWindowBase(rec,i,j,is_bg)
-  local label = is_bg == true and 0+1 or rec.label[j]+1
-  local window = {i,rec.boxes[j][1],rec.boxes[j][2],
-                    rec.boxes[j][3],rec.boxes[j][4],
-                    label}
-  return window
-end
 
-local function createWindowAngle(rec,i,j,is_bg)
-  local label = is_bg == true and 0+1 or rec.label[j]+1
-  --local ang = ( is_bg == false and rec.objects[rec.correspondance[j] ] ) and 
-  --                  rec.objects[rec.correspondance[j] ].viewpoint.azimuth or 0
-  local ang
-  if is_bg == false and rec.objects[rec.correspondance[j] ] then
-    if rec.objects[rec.correspondance[j] ].viewpoint.distance == '0' then
-      ang = rec.objects[rec.correspondance[j] ].viewpoint.azimuth_coarse
-    else
-      ang = rec.objects[rec.correspondance[j] ].viewpoint.azimuth
-    end
-  else
-    ang = 0
+local argcheck = require 'argcheck'
+
+local env = require 'argcheck.env' -- retrieve argcheck environement
+-- this is the default type function
+-- which can be overrided by the user
+function env.istype(obj, typename)
+  if typename == 'DataSet' then
+    return obj._isDataSet
   end
-  local window = {i,rec.boxes[j][1],rec.boxes[j][2],
-                    rec.boxes[j][3],rec.boxes[j][4],
-                    label,ang}
-  return window
-end
-
-function BatchProvider:__init(feat_provider)
-  self.dataset = feat_provider.dataset
-  self.feat_provider = feat_provider
-
-  self.nTimesMoreData = 10
-  self.iter_per_batch = 500
-  
-  self.batch_size = 128
-  self.fg_fraction = 0.25
-  
-  self.fg_threshold = 0.5
-  self.bg_threshold = {0.0,0.5}
-  
-  self.createWindow = createWindowBase--createWindowAngle
-  
-  self.batch_dim = {256*50}
-  self.target_dim = 1
-  
-  self.do_flip = true
-  
-  --self:setupData()
+  if typename == 'FeatureProvider' then
+    return obj._isFeatureProvider
+  end
+  return torch.type(obj) == typename
 end
 
 
-function BatchProvider:setupData()
-  local dataset = self.dataset
-  local bb = {}
-  local bbT = {}
+local initcheck = argcheck{
+  pack=true,
+  noordered=true,
+  {name="dataset",
+   type="DataSet",
+   help="A dataset class" 
+  },
+  {name="feat_provider",
+   type="FeatureProvider",
+   help="A feat provider class"
+  },
+  {name="batch_size",
+   type="number",
+   default=128,
+   help="batch size"},
+  {name="iter_per_batch",
+   type="number",
+   default=10,
+   help=""},
+  {name="nTimesMoreData",
+   type="number",
+   default=10,
+   help=""},
+  {name="fg_fraction",
+   type="number",
+   default=0.25,
+   help="foreground fraction in batch" 
+  },
+  {name="fg_threshold",
+   type="number",
+   default=0.5,
+   help="foreground threshold" 
+  },
+  {name="bg_threshold",
+   type="table",
+   default={0.1,0.5},
+   help="background threshold, in the form {LO,HI}" 
+  },
+  {name="target_dim",
+   type="number",
+   default=1,
+   help=""},
+  {name="do_flip",
+   type="boolean",
+   default=true,
+   help="sample batches with random flips" 
+  },
+}
 
-  for i=0,dataset.num_classes do -- 0 because of background
-    bb[i] = {}
-  end
+function BatchProvider:__init(...)
+  parent.__init(self)
 
-  for i=1,dataset.num_imgs do
-    bbT[i] = {}
-  end
+  local opts = initcheck(...)
+  for k,v in pairs(opts) do self[k] = v end
 
-  for i = 1,dataset.num_imgs do
-    if dataset.num_imgs > 10 then
-      xlua.progress(i,dataset.num_imgs)
-    end
-    
-    local rec = dataset:attachProposals(i)
+  self.batch_dim = self.feat_provider.output_size
   
-    for j=1,rec:size() do    
-      local id = rec.label[j]
-      local is_fg = (rec.overlap[j] >= self.fg_threshold)
-      local is_bg = (not is_fg) and (rec.overlap[j] >= self.bg_threshold[1]  and
-                                     rec.overlap[j] <  self.bg_threshold[2])
-      if is_fg then
-        local window = self.createWindow(rec,i,j,is_bg)
-        table.insert(bb[1], window) -- could be id instead of 1
-      elseif is_bg then
-        local window = self.createWindow(rec,i,j,is_bg)
-        table.insert(bb[0], window)
-      end
-      
-    end
-    
-    for j=0,dataset.num_classes do -- 0 because of background
-      if #bb[j] > 0 then
-        bbT[i][j] = torch.FloatTensor(bb[j])
-      end
-    end
-        
-    bb = {}
-    for i=0,dataset.num_classes do -- 0 because of background
-      bb[i] = {}
-    end
-    collectgarbage()
-  end
-  self.bboxes = bbT
-  --return bbT
 end
-
 
 function BatchProvider:permuteIdx()
   local fg_num_each  = self.fg_num_each
@@ -183,21 +156,12 @@ function BatchProvider:selectBBoxes(fg_windows,bg_windows)
   return fg_w,bg_w
 end
 
-
--- specific for angle estimation
-local function flip_angle(x)
-  return (-x)%360
-end
-
 -- depends on the model
-function BatchProvider:prepareFeatures(im_idx,bboxes,fg_data,bg_data,fg_label,bg_label)
+function BatchProvider:prepareFeatures(im_idx,bboxes,fg_label,bg_label)
 
   local num_pos = bboxes[1] and #bboxes[1] or 0
   local num_neg = bboxes[0] and #bboxes[0] or 0
 
-  fg_data:resize(num_pos,unpack(self.batch_dim))
-  bg_data:resize(num_neg,unpack(self.batch_dim))
-  
   fg_label:resize(num_pos,self.target_dim)
   bg_label:resize(num_neg,self.target_dim)
   
@@ -205,36 +169,29 @@ function BatchProvider:prepareFeatures(im_idx,bboxes,fg_data,bg_data,fg_label,bg
   if self.do_flip then
     flip = torch.random(0,1) == 0
   end
-  --print(bboxes)
+
+  local s_boxes = {}
   for i=1,num_pos do
-    --local bbox = bboxes[1][{i,{2,5}}]
     local bbox = {bboxes[1][i][2],bboxes[1][i][3],bboxes[1][i][4],bboxes[1][i][5]}
-    fg_data[i] = self.feat_provider:getFeature(im_idx,bbox,flip)
+    table.insert(s_boxes,bbox)
     fg_label[i][1] = bboxes[1][i][6]
---[[    if flip then
-      fg_label[i][2] = flip_angle(bboxes[1][i][7])
-    else
-      fg_label[i][2] = bboxes[1][i][7]
-    end
-]]    
   end
   
   for i=1,num_neg do
-    --local bbox = bboxes[0][{i,{2,5}}]
     local bbox = {bboxes[0][i][2],bboxes[0][i][3],bboxes[0][i][4],bboxes[0][i][5]}
-    bg_data[i] = self.feat_provider:getFeature(im_idx,bbox,flip)
+    table.insert(s_boxes,bbox)
     bg_label[i][1] = bboxes[0][i][6]
---[[    if flip then
-      bg_label[i][2] = flip_angle(bboxes[0][i][7])
-    else
-      bg_label[i][2] = bboxes[0][i][7]
-    end]]
   end
-  
---  return fg_data,bg_data,fg_label,bg_label
+
+  -- compute the features
+  local feats = self.feat_provider:getFeature(im_idx,s_boxes,flip)
+  local fg_data = num_pos > 0 and feats:narrow(1,1,num_pos) or nil
+  local bg_data = num_neg > 0 and feats:narrow(1,num_pos+1,num_neg) or nil
+
+  return fg_data, bg_data
 end
 
-function BatchProvider:getBatch(batches,targets)
+function BatchProvider:prepareBatch(batches,targets)
   local dataset = self.dataset
   
   self.fg_num_each = self.fg_fraction * self.batch_size
@@ -257,10 +214,10 @@ function BatchProvider:getBatch(batches,targets)
   local bg_counter = 0
   
   local fg_data,bg_data,fg_label,bg_label
-  fg_data  = torch.FloatTensor()
-  bg_data  = torch.FloatTensor()
   fg_label = torch.IntTensor()
   bg_label = torch.IntTensor()
+
+  local pass_index = torch.type(self.feat_provider) == 'nnf.SPP' and true or false
 
   print('==> Preparing Batch Data')
   for i=1,opts.img_idx_end do
@@ -278,7 +235,13 @@ function BatchProvider:getBatch(batches,targets)
     bboxes[0] = bg_w[curr_idx]
     bboxes[1] = fg_w[curr_idx]
   
-    self:prepareFeatures(curr_idx,bboxes,fg_data,bg_data,fg_label,bg_label)
+    local data
+    if pass_index then
+      data = curr_idx
+    else
+      data = dataset:getImage(curr_idx)
+    end
+    fg_data,bg_data = self:prepareFeatures(data,bboxes,fg_label,bg_label)
     
     for j=1,nbg do
       bg_counter = bg_counter + 1
@@ -297,6 +260,24 @@ function BatchProvider:getBatch(batches,targets)
       batches[b][s]:copy(fg_data[j])
       targets[b][s]:copy(fg_label[j])
     end
+    collectgarbage()
   end
+  collectgarbage()
   return batches,targets
+end
+
+function BatchProvider:getBatch()
+  self._cur = self._cur or math.huge
+  -- we have reached the end of our batch pool, need to recompute
+  if self._cur > self.iter_per_batch then
+    self._batches,self._targets = self:prepareBatch(self._batches,self._targets)
+    self._cur = 1
+  end
+
+  self.batches = self._batches[self._cur]
+  self.targets = self._targets[self._cur]
+  self._cur = self._cur + 1
+
+  return self.batches, self.targets
+
 end

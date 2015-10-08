@@ -29,6 +29,50 @@ local function joinTable(input,dim)
   return output
 end
 
+local function recursiveResizeAsCopyTyped(t1,t2,type)
+  if torch.type(t2) == 'table' then
+    t1 = (torch.type(t1) == 'table') and t1 or {t1}
+    for key,_ in pairs(t2) do
+      t1[key], t2[key] = recursiveResizeAsCopyTyped(t1[key], t2[key], type)
+    end
+  elseif torch.isTensor(t2) then
+    local type = type or t2:type()
+    t1 = torch.isTypeOf(t1,type) and t1 or torch.Tensor():type(type)
+    t1:resize(t2:size()):copy(t2)
+  else
+    error("expecting nested tensors or tables. Got "..
+    torch.type(t1).." and "..torch.type(t2).." instead")
+  end
+  return t1, t2
+end
+
+local function concat(t1,t2,dim)
+  local out
+  assert(t1:type() == t2:type(),'tensors should have the same type')
+  if t1:dim() > 0 and t2:dim() > 0 then
+    dim = dim or t1:dim()
+    out = torch.cat(t1,t2,dim)
+  elseif t1:dim() > 0 then
+    out = t1:clone()
+  else
+    out = t2:clone()
+  end
+  return out
+end
+
+-- modify bbox input
+local function flipBoundingBoxes(bbox, im_width)
+  if bbox:dim() == 1 then 
+    local tt = bbox[1]
+    bbox[1] = im_width-bbox[3]+1
+    bbox[3] = im_width-tt     +1
+  else
+    local tt = bbox[{{},1}]:clone()
+    bbox[{{},1}]:fill(im_width+1):add(-1,bbox[{{},3}])
+    bbox[{{},3}]:fill(im_width+1):add(-1,tt)
+  end
+end
+
 --------------------------------------------------------------------------------
 
 local function keep_top_k(boxes,top_k)
@@ -80,7 +124,6 @@ end
 --------------------------------------------------------------------------------
 
 local function boxoverlap(a,b)
-  --local b = anno.objects[j]
   local b = b.xmin and {b.xmin,b.ymin,b.xmax,b.ymax} or b
     
   local x1 = a:select(2,1):clone()
@@ -267,6 +310,10 @@ utils.VOCap = VOCap
 utils.convertCaffeModelToTorch = convertCaffeModelToTorch
 utils.reshapeLastLinearLayer = reshapeLastLinearLayer
 utils.sanitize = sanitize
+utils.recursiveResizeAsCopyTyped = recursiveResizeAsCopyTyped
+utils.flipBoundingBoxes = flipBoundingBoxes
+utils.concat = concat
+utils.boxoverlap = boxoverlap
 
 return utils
 

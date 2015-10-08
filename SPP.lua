@@ -1,18 +1,89 @@
 local hdf5 = require 'hdf5'
+local flipBoundingBoxes = paths.dofile('utils.lua').flipBoundingBoxes
 
 local SPP = torch.class('nnf.SPP')
+SPP._isFeatureProvider = true
 
---TODO vectorize code ?
-function SPP:__init(dataset,model)
+-- argcheck crashes with that many arguments, and using unordered
+-- doesn't seems practical
+-- [[
+local argcheck = paths.dofile('argcheck.lua')--require 'argcheck'
+local initcheck = argcheck{
+  pack=true,
+  {name="model",
+   type="nn.Sequential",
+   help="conv5 model"},
+  {name="dataset",
+   type="nnf.DataSetPascal", -- change to allow other datasets
+   opt=true,
+   help="A dataset class"},
+  {name="pooling_scales",
+   type="table",
+   default={{1,1},{2,2},{3,3},{6,6}},
+   help="pooling scales"},
+  {name="num_feat_chns",
+   type="number",
+   default=256,
+   help="number of feature channels to be pooled"},
+  {name="scales",
+   type="table",
+   default={480,576,688,874,1200},
+   help="image scales"},
+  {name="sz_conv_standard",
+   type="number",
+   default=13,
+   help=""},
+  {name="step_standard",
+   type="number",
+   default=16,
+   help=""},
+  {name="offset0",
+   type="number",
+   default=21,
+   help=""},
+  {name="offset",
+   type="number",
+   default=6.5,
+   help=""},
+  {name="inputArea",
+   type="number",
+   default=224^2,
+   help="force square crops"},
+  {name="image_transformer",
+   type="nnf.ImageTransformer",
+   default=nnf.ImageTransformer{},
+   help="Class to preprocess input images"},
+  {name="use_cache",
+   type="boolean",
+   default=true,
+   help=""},
+  {name="cachedir",
+   type="string",
+   opt=true,
+   help=""},
+}
+--]]
+
+
+function SPP:__init(...)
 
   self.dataset = dataset
   self.model = model
-  self.spp_pooler = inn.SpatialPyramidPooling({{1,1},{2,2},{3,3},{6,6}}):float()
-  self.image_transformer = nnf.ImageTransformer{}
 
+  local opts = initcheck(...)
+  for k,v in pairs(opts) do self[k] = v end
+
+  --self.num_feat_chns = 256
+  --self.pooling_scales = {{1,1},{2,2},{3,3},{6,6}}
+  local pyr = torch.Tensor(self.pooling_scales):t()
+  local pooled_size = pyr[1]:dot(pyr[2])
+  self.output_size = {self.num_feat_chns*pooled_size}
+
+  --self.spp_pooler = inn.SpatialPyramidPooling(self.pooling_scales):float()
+  --self.image_transformer = nnf.ImageTransformer{}
+--[[
 -- paper=864, their code=874 
   self.scales = {480,576,688,874,1200} -- 874
-  self.randomscale = true
   
   self.sz_conv_standard = 13
   self.step_standard = 16
@@ -24,9 +95,39 @@ function SPP:__init(dataset,model)
   self.use_cache = true
 
   self.cachedir = nil
-  
+  --]]
+  self.train = true
 end
 
+function SPP:training()
+  self.train = true
+end
+
+function SPP:evaluate()
+  self.train = false
+end
+
+-- here just to check
+function SPP:getCrop_old(im_idx,bbox,flip)
+  local flip = flip or false
+  
+  if self.curr_im_idx ~= im_idx or self.curr_doflip ~= flip then
+    self.curr_im_idx = im_idx
+    self.curr_im_feats = self:getConv5(im_idx,flip)
+    self.curr_doflip = flip
+  end
+
+  if flip then
+    flipBoundingBoxes(bbox,self.curr_im_feats.imSize[3])
+  end
+  
+  local bestScale,bestBbox = self:getBestSPPScale(bbox,self.curr_im_feats.imSize,self.curr_im_feats.scales)
+  local box_norm = self:getResposeBoxes(bestBbox)
+
+  local crop_feat = self:getCroppedFeat(self.curr_im_feats.rsp[bestScale],box_norm)
+
+  return crop_feat
+end
 
 function SPP:getCrop(im_idx,bbox,flip)
   local flip = flip or false
@@ -36,52 +137,60 @@ function SPP:getCrop(im_idx,bbox,flip)
     self.curr_im_feats = self:getConv5(im_idx,flip)
     self.curr_doflip = flip
   end
-  
-  local bbox = bbox
+
+  if type(bbox) == 'table' then
+    bbox = torch.FloatTensor(bbox)
+  end
+  bbox = bbox:dim() == 1 and bbox:view(1,-1) or bbox
+
   if flip then
-    local tt = bbox[1]
-    bbox[1] = self.curr_im_feats.imSize[3]-bbox[3]+1
-    bbox[3] = self.curr_im_feats.imSize[3]-tt     +1
+    flipBoundingBoxes(bbox,self.curr_im_feats.imSize[3])
   end
   
-  local bestScale,bestBbox = self:getBestSPPScale(bbox,self.curr_im_feats.imSize,self.curr_im_feats.scales)
-  local box_norm = self:getResposeBoxes(bestBbox)
+  local feat = self.curr_im_feats
+  local bestScale,bestbboxes,bboxes_norm,projected_bb =
+            self:projectBoxes(feat, bbox, feat.scales)
 
-  local crop_feat = self:getCroppedFeat(self.curr_im_feats.rsp[bestScale],box_norm)
+  local crop_feat = {}
+  for i=1,bbox:size(1) do
+    local bbox_ = projected_bb[i]
+    local patch = feat.rsp[bestScale[i]][{{},{bbox_[2],bbox_[4]},{bbox_[1],bbox_[3]}}]
+    table.insert(crop_feat,patch)
+  end
   
   return crop_feat  
 end
+
+-- here just to check
+function SPP:getFeature_old(im_idx,bbox,flip)
+  local flip = flip or false
+
+  local crop_feat = self:getCrop_old(im_idx,bbox,flip)
+
+  local feat = self.spp_pooler:forward(crop_feat)
+  return feat
+end
+
 
 function SPP:getFeature(im_idx,bbox,flip)
   local flip = flip or false
 
   local crop_feat = self:getCrop(im_idx,bbox,flip)
 
-  local feat = self.spp_pooler:forward(crop_feat)
-
-  return feat
-end
-
-
-local function cleaningForward(input,model)
-  local currentOutput = model.modules[1]:updateOutput(input)
-  for i=2,#model.modules do
-    collectgarbage()
-    collectgarbage()
-    currentOutput = model.modules[i]:updateOutput(currentOutput)
-    model.modules[i-1].output:resize()
-    model.modules[i-1].gradInput:resize()
-    if model.modules[i-1].gradWeight then
-      model.modules[i-1].gradWeight:resize()
-    end
-    if model.modules[i-1].gradBias then
-      model.modules[i-1].gradBias:resize()
-    end
+  self._feat = self._feat or torch.FloatTensor()
+  self._feat:resize(#crop_feat,table.unpack(self.output_size))
+  for i=1,#crop_feat do
+    self._feat[i]:copy(self.spp_pooler:forward(crop_feat[i]))
   end
-  model.output = currentOutput
-  return currentOutput
+
+  return self._feat
 end
 
+-- SPP is meant to keep a cache of the conv5 features
+-- for fast training. In this case, we suppose that
+-- we provide the image index in the dataset.
+-- We can also use an image as input, in which case it
+-- won't save a conv5 cache.
 function SPP:getConv5(im_idx,flip)
   local scales = self.scales
   local flip = flip or false
@@ -93,8 +202,16 @@ function SPP:getConv5(im_idx,flip)
   if not cachedir then
     cachedir = ''
   end
+
+  local im_name
+  if not self.dataset then
+    self.use_cache = false
+    im_name = ''
+  else
+    im_name = self.dataset.img_ids[im_idx]
+  end
   
-  local cachefile = paths.concat(self.cachedir,self.dataset.img_ids[im_idx])
+  local cachefile = paths.concat(cachedir,im_name)
 
   if flip then
     cachefile = cachefile..'_flip'
@@ -110,7 +227,12 @@ function SPP:getConv5(im_idx,flip)
       feats.rsp[tostring(i)] = nil
     end
   else
-    local I = self.dataset:getImage(im_idx):float()
+    local I
+    if type(im_idx) == 'number' and self.dataset then
+      I = self.dataset:getImage(im_idx):float()
+    elseif torch.isTensor(im_idx) then
+      I = im_idx
+    end
     I = self.image_transformer:preprocess(I)
     if flip then
       I = image.hflip(I)
@@ -129,7 +251,6 @@ function SPP:getConv5(im_idx,flip)
       local Ir = image.scale(I,sc,sr):type(mtype)
       
       local f = self.model:forward(Ir)
-      --local f = cleaningForward(Ir,self.model)
       
       feats.rsp[i] = torch.FloatTensor(f:size()):copy(f)
     end
@@ -180,7 +301,8 @@ function SPP:getBestSPPScale(bbox,imSize,scales)
 
   local bestScale
 
-  if self.randomscale then
+  if self.train then
+    -- in training, select the scales randomly
     bestScale = torch.random(1,num_scales)
   else
     local inputArea = self.inputArea
@@ -251,6 +373,141 @@ function SPP:getCroppedFeat(feat,bbox)
 
   return patch
 
+end
+
+
+
+local function unique(bboxes)
+  local idx = {}
+  local is_unique = torch.ones(bboxes:size(1))
+  for i=1,bboxes:size(1) do
+    local b = bboxes[i]
+    local n = b[1]..'_'..b[2]..'_'..b[3]..'_'..b[4]..'_'..b[5]
+    if idx[n] then
+      is_unique[i] = 0
+    else
+      idx[n] = i
+    end
+  end
+  return is_unique
+end
+
+-- given a table with the conv5 features at different scales and bboxes in
+-- the original image, project the bboxes in the conv5 space
+function SPP:projectBoxes(feat, bboxes, scales)
+  -- bboxes is a nx4 Tensor with candidate bounding boxes
+  -- in [x1, y1, x2, y2] format
+  local imSize = feat.imSize
+
+  local scales = scales or self.scales
+  local min_dim = math.min(imSize[2],imSize[3])
+
+  local sz_conv_standard = self.sz_conv_standard
+  local step_standard = self.step_standard
+
+  local nboxes = bboxes:size(1)
+
+  -- get best SPP scale
+  local bestScale = torch.FloatTensor(nboxes)
+
+  if self.train then
+    -- in training, select the scales randomly
+    bestScale:random(1,#scales)
+  else
+    local bboxArea = boxes.new():resize(nboxes):zero()
+    bboxArea:map2(bboxes[{{},3}],bboxes[{{},1}],function(xx,xx2,xx1) return xx2-xx1+1 end)
+    bboxArea:map2(bboxes[{{},4}],bboxes[{{},2}],function(xx,xx2,xx1) return xx*(xx2-xx1+1) end)
+
+    local expected_scale = bboxArea:float():pow(-0.5):mul(sz_conv_standard*step_standard*min_dim)
+    expected_scale:round()
+
+    local nbboxDiffArea = torch.FloatTensor(#scales,nboxes)
+
+    for i=1,#scales do
+      nbboxDiffArea[i]:copy(expected_scale):add(-scales[i]):abs()
+    end
+
+    bestScale = select(2,nbboxDiffArea:min(1))[1]
+  end
+
+  local mul_factor = torch.FloatTensor(nboxes,1):copy(bestScale)
+  local idx = 0
+  mul_factor:apply(function(x)
+                     idx = idx + 1
+                     return (scales[x]-1)/(min_dim-1)
+                   end)
+
+  local bestbboxes = torch.FloatTensor(nboxes,4):copy(bboxes)
+  bestbboxes:add(-1):cmul(mul_factor:expand(nboxes,4)):add(1)
+
+  -- response boxes
+
+  local offset0 = self.offset0
+  local offset = self.offset
+
+  local bboxes_norm = bestbboxes:clone()
+  bboxes_norm[{{},{1,2}}]:add(-offset0 + offset):div(step_standard):add( 0.5)
+  bboxes_norm[{{},{1,2}}]:floor():add(1)
+  bboxes_norm[{{},{3,4}}]:add(-offset0 - offset):div(step_standard):add(-0.5)
+  bboxes_norm[{{},{3,4}}]:ceil():add(1)
+
+  local x0gtx1 = bboxes_norm[{{},1}]:gt(bboxes_norm[{{},3}])
+  local y0gty1 = bboxes_norm[{{},2}]:gt(bboxes_norm[{{},4}])
+
+  bboxes_norm[{{},1}][x0gtx1] = bboxes_norm[{{},1}][x0gtx1]:add(bboxes_norm[{{},3}][x0gtx1]):div(2)
+  bboxes_norm[{{},3}][x0gtx1] = (bboxes_norm[{{},1}][x0gtx1])
+
+  bboxes_norm[{{},2}][y0gty1] = bboxes_norm[{{},2}][y0gty1]:add(bboxes_norm[{{},4}][y0gty1]):div(2)
+  bboxes_norm[{{},4}][y0gty1] = (bboxes_norm[{{},2}][y0gty1])
+
+  -- remove repeated projections
+  if self.dedup then
+    local is_unique = unique(torch.cat(bboxes_norm,bestScale:view(-1,1),2))
+    local lin = torch.range(1,is_unique:size(1)):long() -- can also use cumsum instead
+    bboxes_norm = bboxes_norm:index(1,lin[is_unique])
+  end
+  -- clamp on boundaries
+
+  local projected_bb = bboxes_norm:clone()
+
+  for i=1,#scales do
+    local this_scale = bestScale:eq(i)
+    if this_scale:numel() > 0 then
+      projected_bb[{{},2}][this_scale] = projected_bb[{{},2}][this_scale]:clamp(1,feat.rsp[i]:size(2))
+      projected_bb[{{},4}][this_scale] = projected_bb[{{},4}][this_scale]:clamp(1,feat.rsp[i]:size(2))
+      projected_bb[{{},1}][this_scale] = projected_bb[{{},1}][this_scale]:clamp(1,feat.rsp[i]:size(3))
+      projected_bb[{{},3}][this_scale] = projected_bb[{{},3}][this_scale]:clamp(1,feat.rsp[i]:size(3))
+    end
+  end
+
+  --projected_bb:floor()
+  return bestScale,bestbboxes,bboxes_norm,projected_bb
+end
+
+-- don't do anything. could be the bbox regression or SVM, but I won't add it here
+function SPP:postProcess(im,bbox,output)
+  return output,bbox
+end
+
+function SPP:compute(model,inputs)
+  local inputs_s = inputs:split(self.max_batch_size,1)
+
+  self.output = self.output or inputs.new()
+
+  local ttype = model.output:type()
+  self.inputs = self.inputs or torch.Tensor():type(ttype)
+
+  for idx, f in ipairs(inputs_s) do
+    self.inputs:resize(f:size()):copy(f)
+    local output0 = model:forward(self.inputs)
+    local fs = f:size(1)
+    if idx == 1 then
+      local ss = output0[1]:size():totable()
+      self.output:resize(inputs:size(1),table.unpack(ss))
+    end
+    self.output:narrow(1,(idx-1)*self.max_batch_size+1,fs):copy(output0)
+  end
+  return self.output
 end
 
 function SPP:type(t_type)
