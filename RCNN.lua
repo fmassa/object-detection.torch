@@ -99,7 +99,8 @@ function RCNN:getCrop(im_idx,bbox,flip)
   ------
 
   --local patch = image.crop(I,bbox[1],bbox[2],bbox[3],bbox[4]);
-  local patch = image.crop(I,bbox[1],bbox[2],bbox[3],bbox[4]):float();
+  --local patch = image.crop(I,bbox[1],bbox[2],bbox[3],bbox[4]):float();
+  local patch = I[{{},{bbox[2],bbox[4]},{bbox[1],bbox[3]}}]:float()
   local tmp = image.scale(patch,crop_width,crop_height,'bilinear');
 
   if image_mean then
