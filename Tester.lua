@@ -176,7 +176,7 @@ function Tester:test(iteration)
     end
     save_file = paths.concat(pathfolder, dataset.classes[i].. '_boxes_'.. 
                              dataset.dataset_name..self.suffix)
-    torch.save(save_file, aboxes)
+    torch.save(save_file, aboxes[i])
   end
 
   local res = {}
