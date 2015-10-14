@@ -1,15 +1,80 @@
 ## Object detection in torch
 
-Implementation of some object detection frameworks in [torch](http://torch.ch).
+This library aims to provide a simple architecture to easily perform object detection in [torch](http://torch.ch).
+It currently contains code for training the following frameworks: [RCNN](link), [SPP](link) and [Fast-RCNN](link).
+
+It consists of 6 basic classes:
+
+* ImageTransformer: Preprocess an image before feeding it to the network
+* DataSetDetection: Generic dataset class for object detection.
+  * DataSetPascal
+  * DataSetCOCO
+* FeatureProvider: Implements the necessary operations on images and bounding boxes
+  * RCNN
+  * SPP
+  * Fast-RCNN
+* BatchProvider: Samples random patches
+  * BatchProviderRC
+  * BatchProviderIC
+* ImageDetect: Encapsulates a model and a feature provider to perform the detection
+* Tester: Evaluate the detection using Pascal VOC approach.
+
+## Feature Provider
+The `FeatureProvider` class defines the way different algorithms process an image and a set of bounding boxes to feed it to the CNN.
+It implements a `getFeature(image,boxes)` function, which computes the necessary transformations in the input data, a `postProcess()`, which takes the output of the network plus the original inputs and post-process them. This post-processing could be a bounding box regression step, for example.
+
+## Batch Provider
+This class implements sampling strategies for training Object Detectors.
+In its constructor, it takes as argument a `DataSetDetection`, and a `FeatureProvider`.
+It implements a `getBatch` function, which samples from the `DataSet` using `FeatureProvider`.
+
+### BatchProviderRC
+ROI-Centric Batch Provider, it samples the patches randomly over all the pool of patches.
+
+### BatchProviderIC
+Image-Centric Batch Provider, it first samples a set of images, and then a set of patches is sampled on those sampled images.
+
+## Examples
+Here we show a simple example demonstrating how to perform object detection given an image and a set of bounding boxes. 
+
+```lua
+require 'nnf'
+require 'image'
+require 'nn'
+
+model = torch.load('model.t7')
+I = image.lena()
+bboxes = {1,1,200,200}
+
+image_transformer= nnf.ImageTransformer{mean_pix={102.9801,115.9465,122.7717},
+                                        raw_scale = 255,
+                                        swap = {3,2,1}}
+feat_provider = nnf.RCNN{crop_size=227,image_transformer=image_transformer}
+
+-- the following could also be done by creating an instance of ImageDetect
+-- and calling :detect(I,boxes)
+feats = feat_provider:getFeature(I,bboxes)
+scores = feat_provider:compute(model,feats)
+
+-- visualization
+threshold = 0.5
+visualize_detections(I,bboxes,scores,threshold)
+
+```
+
+More examples can be found at [examples](http://github.com/fmassa/object-detection.torch/examples/)
+
+#### Bounding box proposals
+Note that this repo doesn't contain code for generating bounding box proposals. For the moment, they are pre-computed and loaded at run time.
 
 ### Dependencies
 
 It requires the following packages
 
- - [xml](http://doc.lubyk.org/xml.html)
- - [matio-ffi.torch](https://github.com/soumith/matio-ffi.torch)
- - [hdf5](https://github.com/deepmind/torch-hdf5)
- - [inn](https://github.com/szagoruyko/imagine-nn)
+ - [xml](http://doc.lubyk.org/xml.html) (For `DataSetPascal`)
+ - [matio-ffi.torch](https://github.com/soumith/matio-ffi.torch) (For `DataSetPascal`)
+ - [hdf5](https://github.com/deepmind/torch-hdf5) (for `SPP`)
+ - [inn](https://github.com/szagoruyko/imagine-nn) (for `SPP`)
 
 To install them all, do
 
@@ -27,6 +92,10 @@ luarocks install matio
 ```
 
 To install `hdf5`, follow the instructions in [here](https://github.com/deepmind/torch-hdf5/blob/master/doc/usage.md)
+
+## Old code
+The old version of this repo can be found [here](link).
+
 
 ### Running this code
 
@@ -46,15 +115,6 @@ model:add(classifier)
 ```
 where `features` can be a `nn.Sequential` of several convolutions and `pooling_layer` is the last pooling with reshaping of the data to feed it to the classifer. See `models/zeiler.lua` for an example.
 
-To finetune the network for detection, simply run
-```
-th main.lua
-```
-
-To get an overview of the different parameters, do
-```
-th main.lua -h
-```
 
 The default is to consider that the dataset is present in `datasets/VOCdevkit/VOC2007/`.
 The default location of bounding boxes `.mat` files (in RCNN format) is supposed to be in `data/selective_search_data/`.
