@@ -11,6 +11,8 @@ cmd:option('-disp_iter', 100,            'display every n iterations')
 cmd:option('-lr_step',   30000,          'step for reducing the learning rate')
 cmd:option('-save_step', 10000,          'step for saving the model')
 cmd:option('-gpu',       1,              'gpu to use (0 for cpu mode)')
+cmd:option('-seed',      1,              'fix random seed (if ~= 0)')
+cmd:option('-numthreads',6,              'number of threads')
 
 opt = cmd:parse(arg or {})
 
@@ -18,6 +20,9 @@ exp_name = cmd:string(opt.name, opt, {name=true, gpu=true})
 
 rundir = '../cachedir/'..exp_name
 paths.mkdir(rundir)
+
+cmd:log(paths.concat(rundir,'log'), opt)
+cmd:addTime('RCNN Example')
 
 local tensor_type
 if opt.gpu > 0 then
@@ -29,8 +34,17 @@ else
   tensor_type = 'torch.FloatTensor'
 end
 
+if opt.seed ~= 0 then
+  torch.manualSeed(opt.seed)
+  if opt.gpu > 0 then
+    cutorch.manualSeed(opt.seed)
+  end
+end
+
+torch.setnumthreads(opt.numthreads)
+
 --------------------------------------------------------------------------------
--- define data
+-- define data for training
 --------------------------------------------------------------------------------
 
 -- this class holds all the necessary informationn regarding the dataset
@@ -39,6 +53,8 @@ ds = nnf.DataSetPascal{
   datadir='datasets/VOCdevkit',
   roidbdir='data/selective_search_data'
 }
+print('DataSet Training:')
+print(ds)
 -- define the transformations to do in the image before
 -- passing it to the network
 local image_transformer= nnf.ImageTransformer{
@@ -46,6 +62,7 @@ local image_transformer= nnf.ImageTransformer{
   raw_scale = 255,
   swap = {3,2,1}
 }
+
 --------------------------------------------------------------------------------
 -- define feature providers
 --------------------------------------------------------------------------------
@@ -59,6 +76,10 @@ fp = nnf.RCNN{
 }
 -- different frameworks can behave differently during training and testing
 fp:training()
+
+print('Feature Provider:')
+print(fp)
+
 --------------------------------------------------------------------------------
 -- define batch providers
 --------------------------------------------------------------------------------
@@ -72,6 +93,8 @@ bp = nnf.BatchProviderRC{
 }
 bp:setupData()
 
+print('Batch Provider:')
+print(bp)
 --------------------------------------------------------------------------------
 -- define model and criterion
 --------------------------------------------------------------------------------
@@ -82,6 +105,12 @@ criterion = nn.CrossEntropyCriterion()
 
 model:type(tensor_type)
 criterion:type(tensor_type)
+
+print('Model:')
+print(model)
+print('Criterion:')
+print(criterion)
+
 --------------------------------------------------------------------------------
 -- train
 --------------------------------------------------------------------------------
@@ -103,6 +132,7 @@ for i=1,num_iter do
   end
   print(('Iteration %3d/%-3d'):format(i,num_iter))
   trainer:train(opt.disp_iter)
+  print(('  Training error: %.5f'):format(trainer.fx[i]))
 
   if i% save_step == 0 then
     torch.save(paths.concat(rundir, 'model.t7'), lightModel)
@@ -110,10 +140,10 @@ for i=1,num_iter do
 end
 
 torch.save(paths.concat(rundir, 'model.t7'), lightModel)
---------------------------------------------------------------------------------
--- evaluate
---------------------------------------------------------------------------------
 
+--------------------------------------------------------------------------------
+-- evaluation
+--------------------------------------------------------------------------------
 -- add softmax to classfier, because we were using nn.CrossEntropyCriterion
 local softmax = nn.SoftMax()
 softmax:type(tensor_type)
@@ -125,6 +155,8 @@ dsv = nnf.DataSetPascal{
   datadir='datasets/VOCdevkit',
   roidbdir='data/selective_search_data'
 }
+print('DataSet Evaluation:')
+print(dsv)
 
 -- feature provider for evaluation
 fpv = nnf.RCNN{
@@ -132,6 +164,8 @@ fpv = nnf.RCNN{
   crop_size=crop_size
 }
 fpv:evaluate()
+print('Feature Provider Evaluation:')
+print(fpv)
 
 -- define the class to test the model on the full dataset
 tester = nnf.Tester(model, fpv, dsv)
