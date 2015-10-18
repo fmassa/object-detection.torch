@@ -12,8 +12,8 @@ torch.include('nnf','DataSetPascal.lua')
 torch.include('nnf','DataSetCOCO.lua')
 
 torch.include('nnf','BatchProviderBase.lua')
-torch.include('nnf','BatchProvider.lua')
-torch.include('nnf','BatchProviderROI.lua')
+torch.include('nnf','BatchProviderIC.lua')
+torch.include('nnf','BatchProviderRC.lua')
 
 torch.include('nnf','SPP.lua')
 torch.include('nnf','RCNN.lua')

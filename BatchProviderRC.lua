@@ -1,5 +1,5 @@
 local BatchProvider,parent = 
-                    torch.class('nnf.BatchProvider','nnf.BatchProviderBase')
+                    torch.class('nnf.BatchProviderRC','nnf.BatchProviderBase')
 
 
 local argcheck = require 'argcheck'
