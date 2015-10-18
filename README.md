@@ -23,32 +23,68 @@ It consists of 6 basic classes:
 ### Feature Provider
 The `FeatureProvider` class defines the way different algorithms process an image and a set of bounding boxes to feed it to the CNN.
 It implements a `getFeature(image,boxes)` function, which computes the necessary transformations in the input data, a `postProcess()`, which takes the output of the network plus the original inputs and post-process them. This post-processing could be a bounding box regression step, for example.
+Every Feature Provider constructor take as input a `ImageTransformer`, and a `max_batch_size` (used for evaluation).
 
 <a name="rcnn"></a>
 #### RCNN
 This is the first work that used CNNs for object detection using bounding box proposals.
 The transformation is the simplest one. It crops the image at the specified positions given by the bounding boxes, and rescale them to be square.
+The constructor has the following arguments:
+  * `crop_size`
+  * `padding`
+  * `use_square`
+
 <a name="spp"></a>
 #### SPP
 Contrary to RCNN, SPP crops the images in the feature space (here, `conv5`). It allows to compute the convolutional features once for the entire image, making it much more efficient.
+The constructor has the following arguments:
+  * `model`
+  * `pooling_scales`
+  * `num_feat_chns`
+  * `scales`: image scales
+  * `sz_conv_standard`
+  * `step_standard`
+  * `offset0`
+  * `offset`
+  * `inputArea`
+  * `use_cache`
+  * `cache_dir`
+
 <a name="frcnn"></a>
 #### Fast-RCNN
 Similar to SPP, Fast-RCNN also crops the images in the feature space, but instead of keeping the convolutional layers fixed, they allow it to train together with the fully-connected layers.
-
+The constructor has the following arguments:
+  * `scale`
+  * `max_size`
+  * `inputArea`
 
 <a name="batch_provider"></a>
 ### Batch Provider
 This class implements sampling strategies for training Object Detectors.
 In its constructor, it takes as argument a `DataSetDetection`, and a `FeatureProvider`.
 It implements a `getBatch` function, which samples from the `DataSet` using `FeatureProvider`.
+The following arguments are present for all derived classes:
+  * `DataSetDetection`
+  * `FeatureProvider`
+  * `batch_size`
+  * `fg_fraction`
+  * `fg_threshold`
+  * `bg_threshold`
+  * `do_flip`
 
 <a name="batch_provider_rc"></a>
 #### BatchProviderRC
 ROI-Centric Batch Provider, it samples the patches randomly over all the pool of patches.
+To minimize the number of disk access, it reads the data for a specified number of batches and store it in memory.
+The constructor take the following optional arguments:
+  * `iter_per_batch`
+  * `nTimesMoreData`
 
 <a name="batch_provider_ic"></a>
 #### BatchProviderIC
 Image-Centric Batch Provider, it first samples a set of images, and then a set of patches is sampled on those sampled images.
+The constructor take the following optional arguments:
+  * `imgs_per_batch`
 
 ### Examples
 Here we show a simple example demonstrating how to perform object detection given an image and a set of bounding boxes. 

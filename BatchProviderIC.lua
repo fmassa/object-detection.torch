@@ -1,4 +1,4 @@
-local BatchProviderROI, parent = torch.class('nnf.BatchProviderIC','nnf.BatchProviderBase')
+local BatchProvider, parent = torch.class('nnf.BatchProviderIC','nnf.BatchProviderBase')
 
 local argcheck = require 'argcheck'
 
@@ -57,7 +57,7 @@ local initcheck = argcheck{
   },
 }
 
-function BatchProviderROI:__init(...)
+function BatchProvider:__init(...)
   parent.__init(self)
 
   local opts = initcheck(...)
@@ -66,7 +66,7 @@ end
 
 -- setup is the same
 
-function BatchProviderROI:permuteIdx()
+function BatchProvider:permuteIdx()
   local total_img    = self.dataset:size()
   local imgs_per_batch = self.imgs_per_batch
 
@@ -105,7 +105,7 @@ function BatchProviderROI:permuteIdx()
 
 end
 
-function BatchProviderROI:selectBBoxes(fg_windows,bg_windows)
+function BatchProvider:selectBBoxes(fg_windows,bg_windows)
   local fg_num_each  = torch.round(self.fg_num_each/self.imgs_per_batch)
   local bg_num_each  = torch.round(self.bg_num_each/self.imgs_per_batch)
 
@@ -138,7 +138,7 @@ function BatchProviderROI:selectBBoxes(fg_windows,bg_windows)
   return bboxes, labels
 end
 
-function BatchProviderROI:getBatch()
+function BatchProvider:getBatch()
   local dataset = self.dataset
   
   self.fg_num_each = self.fg_fraction * self.batch_size
