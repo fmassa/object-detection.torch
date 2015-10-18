@@ -9,6 +9,7 @@ cmd:option('-lr',        1e-3,           'learning rate')
 cmd:option('-num_iter',  40000,          'number of iterations')
 cmd:option('-disp_iter', 100,            'display every n iterations')
 cmd:option('-lr_step',   30000,          'step for reducing the learning rate')
+cmd:option('-save_step', 10000,          'step for saving the model')
 cmd:option('-gpu',       1,              'gpu to use (0 for cpu mode)')
 
 opt = cmd:parse(arg or {})
@@ -74,7 +75,7 @@ bp:setupData()
 --------------------------------------------------------------------------------
 -- define model and criterion
 --------------------------------------------------------------------------------
-paths.dofile('../models/rcnn.lua')
+paths.dofile('../models/alexnet.lua')
 model = createModel()
 
 criterion = nn.CrossEntropyCriterion()
@@ -88,7 +89,8 @@ criterion:type(tensor_type)
 trainer = nnf.Trainer(model, criterion, bp)
 
 local num_iter = opt.num_iter/opt.disp_iter
-local step_iter = opt.lr_step/opt.disp_iter
+local lr_step = opt.lr_step/opt.disp_iter
+local save_step = opt.save_step/opt.disp_iter
 
 trainer.optimState.learningRate = opt.lr
 
