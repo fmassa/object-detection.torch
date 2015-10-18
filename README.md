@@ -1,40 +1,56 @@
 ## Object detection in torch
 
 This library aims to provide a simple architecture to easily perform object detection in [torch](http://torch.ch).
-It currently contains code for training the following frameworks: [RCNN](link), [SPP](link) and [Fast-RCNN](link).
+It currently contains code for training the following frameworks: [RCNN](http://arxiv.org/abs/1311.2524), [SPP](http://arxiv.org/abs/1406.4729) and [Fast-RCNN](http://arxiv.org/abs/1504.08083).
 
 It consists of 6 basic classes:
 
 * ImageTransformer: Preprocess an image before feeding it to the network
 * DataSetDetection: Generic dataset class for object detection.
   * DataSetPascal
-  * DataSetCOCO
-* FeatureProvider: Implements the necessary operations on images and bounding boxes
-  * RCNN
-  * SPP
-  * Fast-RCNN
-* BatchProvider: Samples random patches
-  * BatchProviderRC
-  * BatchProviderIC
+  * DataSetCOCO (not finished)
+* [FeatureProvider](#feat_provider): Implements the necessary operations on images and bounding boxes
+  * [RCNN](#rcnn)
+  * [SPP](#spp)
+  * [Fast-RCNN](#frcnn)
+* [BatchProvider](#batch_provider): Samples random patches
+  * [BatchProviderRC](#batch_provider_rc): ROI-Centric
+  * [BatchProviderIC](#batch_provider_ic): Image-Centric
 * ImageDetect: Encapsulates a model and a feature provider to perform the detection
 * Tester: Evaluate the detection using Pascal VOC approach.
 
-## Feature Provider
+<a name="feat_provider"></a>
+### Feature Provider
 The `FeatureProvider` class defines the way different algorithms process an image and a set of bounding boxes to feed it to the CNN.
 It implements a `getFeature(image,boxes)` function, which computes the necessary transformations in the input data, a `postProcess()`, which takes the output of the network plus the original inputs and post-process them. This post-processing could be a bounding box regression step, for example.
 
-## Batch Provider
+<a name="rcnn"></a>
+#### RCNN
+This is the first work that used CNNs for object detection using bounding box proposals.
+The transformation is the simplest one. It crops the image at the specified positions given by the bounding boxes, and rescale them to be square.
+<a name="spp"></a>
+#### SPP
+Contrary to RCNN, SPP crops the images in the feature space (here, `conv5`). It allows to compute the convolutional features once for the entire image, making it much more efficient.
+<a name="frcnn"></a>
+#### Fast-RCNN
+Similar to SPP, Fast-RCNN also crops the images in the feature space, but instead of keeping the convolutional layers fixed, they allow it to train together with the fully-connected layers.
+
+
+<a name="batch_provider"></a>
+### Batch Provider
 This class implements sampling strategies for training Object Detectors.
 In its constructor, it takes as argument a `DataSetDetection`, and a `FeatureProvider`.
 It implements a `getBatch` function, which samples from the `DataSet` using `FeatureProvider`.
 
-### BatchProviderRC
+<a name="batch_provider_rc"></a>
+#### BatchProviderRC
 ROI-Centric Batch Provider, it samples the patches randomly over all the pool of patches.
 
-### BatchProviderIC
+<a name="batch_provider_ic"></a>
+#### BatchProviderIC
 Image-Centric Batch Provider, it first samples a set of images, and then a set of patches is sampled on those sampled images.
 
-## Examples
+### Examples
 Here we show a simple example demonstrating how to perform object detection given an image and a set of bounding boxes. 
 
 ```lua
@@ -62,7 +78,7 @@ visualize_detections(I,bboxes,scores,threshold)
 
 ```
 
-More examples can be found at [examples](http://github.com/fmassa/object-detection.torch/examples/)
+For an illustration on how to use this code to train a detector, or to evaluate it on Pascal, see the [examples](http://github.com/fmassa/object-detection.torch/tree/master/examples).
 
 #### Bounding box proposals
 Note that this repo doesn't contain code for generating bounding box proposals. For the moment, they are pre-computed and loaded at run time.
@@ -93,8 +109,8 @@ luarocks install matio
 
 To install `hdf5`, follow the instructions in [here](https://github.com/deepmind/torch-hdf5/blob/master/doc/usage.md)
 
-## Old code
-The old version of this repo can be found [here](link).
+### Old code
+The old version of this repo can be found [here](https://github.com/fmassa/object-detection.torch/tree/legacy).
 
 
 ### Running this code
