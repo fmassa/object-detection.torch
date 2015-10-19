@@ -88,7 +88,7 @@ The constructor take the following optional arguments:
 
 ### Examples
 Here we show a simple example demonstrating how to perform object detection given an image and a set of bounding boxes. 
-
+Run it using `qlua` for the visualization part.
 ```lua
 require 'nnf'
 require 'image'
@@ -96,19 +96,23 @@ require 'nn'
 
 model = torch.load('model.t7')
 I = image.lena()
-bboxes = {1,1,200,200}
+-- generate some random bounding boxes
+bboxes = torch.Tensor(100,4)
+bboxes:select(2,1):random(1,I:size(3)/2)
+bboxes:select(2,2):random(1,I:size(2)/2)
+bboxes:select(2,3):random(I:size(3)/2+1,I:size(3))
+bboxes:select(2,4):random(I:size(2)/2+1,I:size(2))
 
 image_transformer= nnf.ImageTransformer{mean_pix={102.9801,115.9465,122.7717},
                                         raw_scale = 255,
                                         swap = {3,2,1}}
 feat_provider = nnf.RCNN{crop_size=227,image_transformer=image_transformer}
 
--- the following could also be done by creating an instance of ImageDetect
--- and calling :detect(I,boxes)
-feats = feat_provider:getFeature(I,bboxes)
-scores = feat_provider:compute(model,feats)
+detector = nnf.ImageDetect(model, feat_provider)
+scores, boxes = detector:detect(I, boxes)
 
 -- visualization
+dofile 'visualize_detections.lua'
 threshold = 0.5
 visualize_detections(I,bboxes,scores,threshold)
 

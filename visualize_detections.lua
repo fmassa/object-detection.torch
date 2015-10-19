@@ -19,7 +19,7 @@ function visualize_detections(im,boxes,scores,thresh,cl_names)
   local rr = r[idx_thresh]
   local boxes_thresh = boxes:index(1,rr)
   
-  local keep = nms(torch.cat(boxes_thresh:float(),max_score,2),0.3)
+  local keep = nms(torch.cat(boxes_thresh:float(),max_score:float(),2),0.3)
   
   boxes_thresh = boxes_thresh:index(1,keep)
   max_score = max_score:index(1,keep)
