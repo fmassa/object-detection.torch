@@ -109,7 +109,7 @@ image_transformer= nnf.ImageTransformer{mean_pix={102.9801,115.9465,122.7717},
 feat_provider = nnf.RCNN{crop_size=227,image_transformer=image_transformer}
 
 detector = nnf.ImageDetect(model, feat_provider)
-scores, boxes = detector:detect(I, boxes)
+scores, bboxes = detector:detect(I, bboxes)
 
 -- visualization
 dofile 'visualize_detections.lua'
@@ -122,6 +122,22 @@ For an illustration on how to use this code to train a detector, or to evaluate 
 
 #### Bounding box proposals
 Note that this repo doesn't contain code for generating bounding box proposals. For the moment, they are pre-computed and loaded at run time.
+
+#### Model definition
+All the detection framework implemented here supposes that you already have a pre-trained classification network (trained for example on ImageNet). They reuse this pre-trained network as an initialization for the subsequent fine-tuning.
+
+In `models/` you will find the model definition for several classic networks used in object detection.
+
+The zeiler pretrained model is available at [https://drive.google.com/open?id=0B-TTdm1WNtybdzdMUHhLc05PSE0&authuser=0](https://drive.google.com/open?id=0B-TTdm1WNtybdzdMUHhLc05PSE0&authuser=0).
+It is supposed to be at `data/models`
+If you want to use your own model in SPP framework, make sure that it follows the pattern
+```
+model = nn.Sequential()
+model:add(features)
+model:add(pooling_layer)
+model:add(classifier)
+```
+where `features` can be a `nn.Sequential` of several convolutions and `pooling_layer` is the last pooling with reshaping of the data to feed it to the classifer. See `models/zeiler.lua` for an example.
 
 ### Dependencies
 
@@ -159,18 +175,6 @@ First, clone this repo
 ```
 git clone https://github.com/fmassa/object-detection.torch.git
 ```
-
-The zeiler pretrained model is available at [https://drive.google.com/open?id=0B-TTdm1WNtybdzdMUHhLc05PSE0&authuser=0](https://drive.google.com/open?id=0B-TTdm1WNtybdzdMUHhLc05PSE0&authuser=0).
-It is supposed to be at `data/models`.
-If you want to use your own model in SPP framework, make sure that it follows the pattern
-```
-model = nn.Sequential()
-model:add(features)
-model:add(pooling_layer)
-model:add(classifier)
-```
-where `features` can be a `nn.Sequential` of several convolutions and `pooling_layer` is the last pooling with reshaping of the data to feed it to the classifer. See `models/zeiler.lua` for an example.
-
 
 The default is to consider that the dataset is present in `datasets/VOCdevkit/VOC2007/`.
 The default location of bounding boxes `.mat` files (in RCNN format) is supposed to be in `data/selective_search_data/`.
