@@ -164,6 +164,14 @@ function RCNN:getFeature(im,bbox,flip)
     assert(self.dataset, 'you must provide a dataset if using numeric indices')
     im = self.dataset:getImage(im)
   end
+
+  if torch.type(im) ~= 'torch.FloatTensor' then
+    -- force image to be float
+    self._im = self._im or torch.FloatTensor()
+    self._im:resize(im:size()):copy(im)
+    im = self._im
+  end
+
   if type(bbox) == 'table' then
     bbox = torch.FloatTensor(bbox)
   end
