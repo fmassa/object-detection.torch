@@ -1,4 +1,3 @@
-local argcheck = require 'argcheck'
 local flipBoundingBoxes = paths.dofile('utils.lua').flipBoundingBoxes
 
 local argcheck = require 'argcheck'
@@ -25,6 +24,14 @@ local initcheck = argcheck{
    type="number",
    default=128,
    help="maximum size of batches during evaluation"},
+  {name="num_threads",
+   type="number",
+   default=8,
+   help="number of threads for bounding box cropping"},
+  {name="iter_per_thread",
+   type="number",
+   default=8,
+   help="number of bbox croppings per thread"},
   {name="dataset",
    type="nnf.DataSetPascal", -- change to allow other datasets
    opt=true,
@@ -35,41 +42,12 @@ local initcheck = argcheck{
 local RCNN = torch.class('nnf.RCNN')
 RCNN._isFeatureProvider = true
 
-function RCNN:__init(...)
---  self.image_transformer = nnf.ImageTransformer{
---                                  mean_pix={123.68/255,116.779/255,103.939/255}}
-  
-  self.image_mean = nil
-
-  local opts = initcheck(...)
-  for k,v in pairs(opts) do self[k] = v end
-
-  self.output_size = {3,self.crop_size,self.crop_size}
-  self.train = true
-end
-
-function RCNN:training()
-  self.train = true
-end
-
-function RCNN:evaluate()
-  self.train = false
-end
-
-function RCNN:getCrop(output,I,bbox)
-  -- suppose I is in BGR, as image_mean
-  -- [x1 y1 x2 y2] order
-
-  local crop_size = self.crop_size
-  local image_mean = self.image_mean
-  local padding = self.padding
-  local use_square = self.use_square
-
+local function RCNNCrop(output,I,box,crop_size,padding,use_square,crop_buffer)
   local pad_w = 0;
   local pad_h = 0;
   local crop_width = crop_size;
   local crop_height = crop_size;
-
+  local bbox = {box[1],box[2],box[3],box[4]}
   ------
   if padding > 0 or use_square then
     local scale = crop_size/(crop_size - padding*2)
@@ -121,28 +99,62 @@ function RCNN:getCrop(output,I,bbox)
   ------
 
   local patch = I[{{},{bbox[2],bbox[4]},{bbox[1],bbox[3]}}]
-  self._crop = self._crop or torch.FloatTensor(3,self.crop_size,self.crop_size)
-  self._crop:resize(3,crop_height,crop_width)
-  image.scale(self._crop,patch,'bilinear');
-  local tmp = self._crop
+  crop_buffer:resize(3,crop_height,crop_width)
+  image.scale(crop_buffer,patch,'bilinear');
 
-  if image_mean then
-    tmp:add(-1,image_mean[{{},{pad_h+1,pad_h+crop_height},
-                              {pad_w+1,pad_w+crop_width}}])
-  end
-
-  output[{{},{pad_h+1,pad_h+crop_height}, {pad_w+1,pad_w+crop_width}}] = tmp
-
-  return output
+  output[{{},{pad_h+1,pad_h+crop_height}, {pad_w+1,pad_w+crop_width}}] = crop_buffer
 
 end
 
-function RCNN:getFeature(im_idx,bbox,flip)
-  local flip = flip==nil and false or flip
+
+function RCNN:__init(...)
   
-  local crop_feat = self:getCrop(im_idx,bbox,flip)
-  
-  return crop_feat
+  local opts = initcheck(...)
+  for k,v in pairs(opts) do self[k] = v end
+
+  self.output_size = {3,self.crop_size,self.crop_size}
+  self.train = true
+
+  if self.num_threads > 1 then
+    local crop_size = self.crop_size
+    local threads = require 'threads'
+    threads.serialization('threads.sharedserialize')
+    self.donkeys = threads.Threads(
+      self.num_threads,
+      function()
+        require 'torch'
+        require 'image'
+      end,
+      function(idx)
+        RCNNCrop = RCNNCrop
+        torch.setheaptracking(true)
+        crop_buffer = torch.FloatTensor(3,crop_size,crop_size)
+        print(string.format('Starting RCNN thread with id: %d', idx))
+      end
+      )
+  end
+end
+
+function RCNN:training()
+  self.train = true
+end
+
+function RCNN:evaluate()
+  self.train = false
+end
+
+function RCNN:getCrop(output,I,bbox)
+  -- [x1 y1 x2 y2] order
+
+  local crop_size = self.crop_size
+  local padding = self.padding
+  local use_square = self.use_square
+
+  self._crop_buffer = self._crop_buffer or torch.FloatTensor(3,crop_size,crop_size)
+  RCNNCrop(output,I,bbox,crop_size,padding,use_square,self._crop_buffer)
+
+  return output
+
 end
 
 function RCNN:getFeature(im,bbox,flip)
@@ -169,9 +181,43 @@ function RCNN:getFeature(im,bbox,flip)
 
   self._feat:resize(num_boxes,table.unpack(self.output_size)):zero()
 
-  -- use threads to make it faster
-  for i=1,num_boxes do
-    self:getCrop(self._feat[i],im,bbox[i])
+  -- use threads to speed up bbox processing
+  if self.num_threads > 1 and num_boxes > self.iter_per_thread then
+    local feat = self._feat
+    local img = im
+    local bndbox = bbox
+    local crop_size = self.crop_size
+    local padding = self.padding
+    local use_square = self.use_square
+    local iter_per_thread = self.iter_per_thread
+    local num_launches = math.ceil(num_boxes/iter_per_thread)
+    for i=1,num_launches do
+      local iter_per_thread_local
+      if i == num_launches then
+        -- last thread launches the remainder of the bboxes
+        iter_per_thread_local = (num_boxes-1)%iter_per_thread + 1
+      else
+        iter_per_thread_local = iter_per_thread
+      end
+      self.donkeys:addjob(
+      function()
+        for j=1,iter_per_thread_local do
+          local f = feat[(i-1)*iter_per_thread+j]
+          local boundingbox = bndbox[(i-1)*iter_per_thread+j]
+          -- crop_buffer is global in each thread
+          RCNNCrop(f,img,boundingbox,crop_size,padding,use_square,crop_buffer)
+        end
+        --collectgarbage()
+        return
+      end
+      )
+    end
+    self.donkeys:synchronize()
+
+  else
+    for i=1,num_boxes do
+      self:getCrop(self._feat[i],im,bbox[i])
+    end
   end
   
   return self._feat
