@@ -140,6 +140,12 @@ function SPP:getCrop(im_idx,bbox,flip)
 
   if type(bbox) == 'table' then
     bbox = torch.FloatTensor(bbox)
+  elseif torch.isTensor(bbox) and flip then
+    -- creates a copy of the bboxes to avoid modifying the original
+    -- bboxes in the flipping
+    self._bbox = self._bbox or torch.FloatTensor()
+    self._bbox:resize(bbox:size()):copy(bbox)
+    bbox = self._bbox
   end
   bbox = bbox:dim() == 1 and bbox:view(1,-1) or bbox
 

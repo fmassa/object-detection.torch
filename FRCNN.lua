@@ -118,6 +118,7 @@ function FRCNN:projectImageROIs(im_rois,scales,do_flip,imgs_size)
       end
     end
   else -- not yet tested
+    error('Multi-scale testing not yet tested')
     local scales = torch.FloatTensor(scales)
     im_rois = im_rois[1]
     local widths = im_rois[{{},3}] - im_rois[{{},1}] + 1
