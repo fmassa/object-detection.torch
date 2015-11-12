@@ -2,6 +2,9 @@
 
 Implementation of some object detection frameworks in [torch](http://torch.ch).
 
+### Note on new code
+You should probably check the [refactoring branch of this repository](https://github.com/fmassa/object-detection.torch/tree/refactoring), which simplifies the code structure, and also contains an implementation of Fast-RCNN and threaded RCNN (making it much faster than standard RCNN). It will be merged to master soon.
+
 ### Dependencies
 
 It requires the following packages
