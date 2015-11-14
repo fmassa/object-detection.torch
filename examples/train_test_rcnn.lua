@@ -44,6 +44,30 @@ end
 torch.setnumthreads(opt.numthreads)
 
 --------------------------------------------------------------------------------
+-- define model and criterion
+--------------------------------------------------------------------------------
+paths.dofile('../models/alexnet.lua')
+model = createModel()
+
+criterion = nn.CrossEntropyCriterion()
+
+model:type(tensor_type)
+criterion:type(tensor_type)
+
+print('Model:')
+print(model)
+print('Criterion:')
+print(criterion)
+
+-- define the transformations to do in the image before
+-- passing it to the network
+local image_transformer= nnf.ImageTransformer{
+  mean_pix={102.9801,115.9465,122.7717},
+  raw_scale = 255,
+  swap = {3,2,1}
+}
+
+--------------------------------------------------------------------------------
 -- define data for training
 --------------------------------------------------------------------------------
 
@@ -55,14 +79,6 @@ ds = nnf.DataSetPascal{
 }
 print('DataSet Training:')
 print(ds)
--- define the transformations to do in the image before
--- passing it to the network
-local image_transformer= nnf.ImageTransformer{
-  mean_pix={102.9801,115.9465,122.7717},
-  raw_scale = 255,
-  swap = {3,2,1}
-}
-
 --------------------------------------------------------------------------------
 -- define feature providers
 --------------------------------------------------------------------------------
@@ -72,7 +88,8 @@ local crop_size = 224
 -- the feature provider extract the features for a given image + bounding box
 fp = nnf.RCNN{
   image_transformer=image_transformer,
-  crop_size=crop_size
+  crop_size=crop_size,
+  num_threads=opt.numthreads
 }
 -- different frameworks can behave differently during training and testing
 fp:training()
@@ -95,22 +112,6 @@ bp:setupData()
 
 print('Batch Provider:')
 print(bp)
---------------------------------------------------------------------------------
--- define model and criterion
---------------------------------------------------------------------------------
-paths.dofile('../models/alexnet.lua')
-model = createModel()
-
-criterion = nn.CrossEntropyCriterion()
-
-model:type(tensor_type)
-criterion:type(tensor_type)
-
-print('Model:')
-print(model)
-print('Criterion:')
-print(criterion)
-
 --------------------------------------------------------------------------------
 -- train
 --------------------------------------------------------------------------------
@@ -144,7 +145,7 @@ torch.save(paths.concat(rundir, 'model.t7'), lightModel)
 --------------------------------------------------------------------------------
 -- evaluation
 --------------------------------------------------------------------------------
--- add softmax to classfier, because we were using nn.CrossEntropyCriterion
+-- add softmax to classifier, because we were using nn.CrossEntropyCriterion
 local softmax = nn.SoftMax()
 softmax:type(tensor_type)
 model:add(softmax)
@@ -161,7 +162,8 @@ print(dsv)
 -- feature provider for evaluation
 fpv = nnf.RCNN{
   image_transformer=image_transformer,
-  crop_size=crop_size
+  crop_size=crop_size,
+  num_threads=opt.numthreads
 }
 fpv:evaluate()
 print('Feature Provider Evaluation:')

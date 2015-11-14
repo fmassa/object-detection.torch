@@ -33,6 +33,7 @@ The constructor has the following arguments:
   * `crop_size`
   * `padding`
   * `use_square`
+  * `num_threads` number of parallel threads
 
 <a name="spp"></a>
 #### SPP
@@ -106,7 +107,8 @@ bboxes:select(2,4):random(I:size(2)/2+1,I:size(2))
 image_transformer= nnf.ImageTransformer{mean_pix={102.9801,115.9465,122.7717},
                                         raw_scale = 255,
                                         swap = {3,2,1}}
-feat_provider = nnf.RCNN{crop_size=227,image_transformer=image_transformer}
+feat_provider = nnf.RCNN{crop_size=227,image_transformer=image_transformer,
+                         num_threads=6}
 
 detector = nnf.ImageDetect(model, feat_provider)
 scores, bboxes = detector:detect(I, bboxes)
