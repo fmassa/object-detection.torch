@@ -59,6 +59,7 @@ The constructor has the following arguments:
   * `scale`
   * `max_size`
   * `inputArea`
+
 The output of `getFeature()` is a table with two entries, the preprocessed image/images as the first element, and the projected bounding boxes. An example of a CNN model structure which can be used with Fast-RCNN is as follows:
 ```lua
 -- define features and classifier as you wish.
