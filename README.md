@@ -59,6 +59,32 @@ The constructor has the following arguments:
   * `scale`
   * `max_size`
   * `inputArea`
+The output of `getFeature()` is a table with two entries, the preprocessed image/images as the first element, and the projected bounding boxes. An example of a CNN model structure which can be used with Fast-RCNN is as follows:
+```lua
+-- define features and classifier as you wish.
+-- Can use loadcaffe to read from a saved model, for example
+features   = torch.load('alexnet_features.t7')
+classifier = torch.load('alexnet_classifier.t7')
+
+-- define the ROIPooling layer
+-- can use either inn.ROIPooling or nnf.ROIPooling (with CPU support)
+-- let's just use standard parameters from Fast-RCNN paper
+local ROIPooling = inn.ROIPooling(6,6):setSpatialScale(1/16)
+
+-- create parallel model which takes as input the images and
+-- bounding boxes, and pass the images through the convolutional
+-- features and simply copy the bounding boxes
+local prl = nn.ParallelTable()
+prl:add(features)
+prl:add(nn.Identity())
+
+-- this is the final model
+model = nn.Sequential()
+model:add(prl)
+model:add(ROIPooling)
+model:add(nn.View(-1):setNumInputDims(3))
+model:add(classifier)
+```
 
 <a name="batch_provider"></a>
 ### Batch Provider
