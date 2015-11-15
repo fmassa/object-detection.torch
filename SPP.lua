@@ -6,7 +6,7 @@ SPP._isFeatureProvider = true
 
 -- argcheck crashes with that many arguments, and using unordered
 -- doesn't seems practical
--- [[
+
 local argcheck = paths.dofile('argcheck.lua')--require 'argcheck'
 local initcheck = argcheck{
   pack=true,
@@ -62,7 +62,7 @@ local initcheck = argcheck{
    opt=true,
    help=""},
 }
---]]
+
 
 
 function SPP:__init(...)
@@ -532,6 +532,33 @@ end
 
 function SPP:cuda()
   return self:type('torch.CudaTensor')
+end
+
+function SPP:saveConvCache()
+  assert(self.dataset, 'need to set a dataset to save the cache')
+  assert(self.use_cache, 'use_cache need to be true')
+  assert(self.cachedir, 'cachedir need to be set')
+
+  local dataset = self.dataset
+
+  print('Caching features for '..dataset.dataset_name..' '
+        ..dataset.image_set)
+  local feat_cachedir = self.cachedir
+  for i=1,dataset:size() do
+    xlua.progress(i,dataset:size())
+    local im_name = dataset.img_ids[i]
+    local cachefile = paths.concat(feat_cachedir,im_name)
+    if not paths.filep(cachefile..'.h5') then
+      local f = self:getConv5(i)
+    end
+    if not paths.filep(cachefile..'_flip.h5') then
+      local f = self:getConv5(i,true)
+    end
+    if i%50 == 0 then
+      collectgarbage()
+      collectgarbage()
+    end
+  end
 end
 
 function SPP:__tostring()

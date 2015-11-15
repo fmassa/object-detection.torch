@@ -23,7 +23,7 @@ It consists of 7 basic classes:
 <a name="feat_provider"></a>
 ### Feature Provider
 The `FeatureProvider` class defines the way different algorithms process an image and a set of bounding boxes to feed it to the CNN.
-It implements a `getFeature(image,boxes)` function, which computes the necessary transformations in the input data, a `postProcess()`, which takes the output of the network plus the original inputs and post-process them. This post-processing could be a bounding box regression step, for example.
+It implements a `getFeature(image, boxes [,flip])` function, which computes the necessary transformations in the input data (the optional `flip` argument horizontaly flips the image and the bounding box correspondingly), a `postProcess()`, which takes the output of the network plus the original inputs and post-process them. This post-processing could be a bounding box regression step, for example.
 Every Feature Provider constructor take as input a `ImageTransformer`, and a `max_batch_size` (used for evaluation).
 
 <a name="rcnn"></a>
@@ -51,6 +51,8 @@ The constructor has the following arguments:
   * `inputArea`
   * `use_cache`
   * `cache_dir`
+
+SPP allows faster training/testing by caching the convolutional feature maps. You can provide to `getFeature` instead of an image `I` an image index `i` (from a `DataSetDetection` object), which will load the corresponding feature map from disk (if already computed and if `use_cache` is set to `true`). To easily cache all features of a dataset in disk, use the method `:saveConvCache()`.
 
 <a name="frcnn"></a>
 #### Fast-RCNN
