@@ -262,3 +262,13 @@ function RCNN:compute(model,inputs)
   end
   return self.output
 end
+
+function RCNN:__tostring()
+  local str = torch.type(self)
+  str = str .. '\n  Crop size: ' .. self.crop_size
+  str = str .. '\n  Context padding: ' .. self.padding
+  if self.use_square then
+    str = str .. '\n  Use square: true'
+  end
+  return str
+end

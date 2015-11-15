@@ -18,7 +18,7 @@ local initcheck = argcheck{
   {name="inputArea",
    type="number",
    default=224^2,
-   help="force square crops"},
+   help="input area of the bounding box"},
   {name="image_transformer",
    type="nnf.ImageTransformer",
    default=nnf.ImageTransformer{},
@@ -176,3 +176,10 @@ function FRCNN:compute(model, inputs)
   return model:forward(self.inputs)
 end
 
+function FRCNN:__tostring()
+  local str = torch.type(self)
+  str = str .. '\n  Image scales: [' .. table.concat(self.scale,', ')..']'
+  str = str .. '\n  Max image size: ' .. self.max_size
+  str = str .. '\n  Input area: ' .. self.inputArea
+  return str
+end

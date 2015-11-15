@@ -37,3 +37,12 @@ function ImageTransformer:preprocess(I)
   return I
 end
 
+function ImageTransformer:__tostring()
+  local str = torch.type(self)
+  if self.swap then
+    str = str .. '\n  Channel swap: [' .. table.concat(self.swap,', ') .. ']'
+  end
+  str = str .. '\n  Raw scale: '.. self.raw_scale
+  str = str .. '\n  Mean pixel: [' .. table.concat(self.mean_pix,', ') .. ']'
+  return str
+end

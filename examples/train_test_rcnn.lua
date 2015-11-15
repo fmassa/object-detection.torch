@@ -16,7 +16,7 @@ cmd:option('-numthreads',6,              'number of threads')
 
 opt = cmd:parse(arg or {})
 
-exp_name = cmd:string(opt.name, opt, {name=true, gpu=true})
+exp_name = cmd:string(opt.name, opt, {name=true, gpu=true, numthreads=true})
 
 rundir = '../cachedir/'..exp_name
 paths.mkdir(rundir)
@@ -29,9 +29,11 @@ if opt.gpu > 0 then
   require 'cunn'
   cutorch.setDevice(opt.gpu)
   tensor_type = 'torch.CudaTensor'
+  print('Using GPU mode on device '..opt.gpu)
 else
   require 'nn'
   tensor_type = 'torch.FloatTensor'
+  print('Using CPU mode')
 end
 
 if opt.seed ~= 0 then
@@ -39,6 +41,7 @@ if opt.seed ~= 0 then
   if opt.gpu > 0 then
     cutorch.manualSeed(opt.seed)
   end
+  print('Using fixed seed: '..opt.seed)
 end
 
 torch.setnumthreads(opt.numthreads)
@@ -46,7 +49,7 @@ torch.setnumthreads(opt.numthreads)
 --------------------------------------------------------------------------------
 -- define model and criterion
 --------------------------------------------------------------------------------
-paths.dofile('../models/alexnet.lua')
+local createModel = paths.dofile('../models/alexnet.lua')
 model = createModel()
 
 criterion = nn.CrossEntropyCriterion()
@@ -67,6 +70,7 @@ local image_transformer= nnf.ImageTransformer{
   swap = {3,2,1}
 }
 
+print(image_transformer)
 --------------------------------------------------------------------------------
 -- define data for training
 --------------------------------------------------------------------------------
@@ -75,7 +79,8 @@ local image_transformer= nnf.ImageTransformer{
 ds = nnf.DataSetPascal{
   image_set='trainval',
   datadir='datasets/VOCdevkit',
-  roidbdir='data/selective_search_data'
+  roidbdir='data/selective_search_data',
+  year=2007
 }
 print('DataSet Training:')
 print(ds)
@@ -154,7 +159,8 @@ model:add(softmax)
 dsv = nnf.DataSetPascal{
   image_set='test',
   datadir='datasets/VOCdevkit',
-  roidbdir='data/selective_search_data'
+  roidbdir='data/selective_search_data',
+  year=2007
 }
 print('DataSet Evaluation:')
 print(dsv)

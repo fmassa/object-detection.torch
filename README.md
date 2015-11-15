@@ -3,7 +3,7 @@
 This library aims to provide a simple architecture to easily perform object detection in [torch](http://torch.ch).
 It currently contains code for training the following frameworks: [RCNN](http://arxiv.org/abs/1311.2524), [SPP](http://arxiv.org/abs/1406.4729) and [Fast-RCNN](http://arxiv.org/abs/1504.08083).
 
-It consists of 6 basic classes:
+It consists of 7 basic classes:
 
 * ImageTransformer: Preprocess an image before feeding it to the network
 * DataSetDetection: Generic dataset class for object detection.
@@ -17,6 +17,7 @@ It consists of 6 basic classes:
   * [BatchProviderRC](#batch_provider_rc): ROI-Centric
   * [BatchProviderIC](#batch_provider_ic): Image-Centric
 * ImageDetect: Encapsulates a model and a feature provider to perform the detection
+* Trainer: Simple class to perform the model training.
 * Tester: Evaluate the detection using Pascal VOC approach.
 
 <a name="feat_provider"></a>

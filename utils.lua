@@ -2,6 +2,7 @@
 -- utility functions for the evaluation part
 --------------------------------------------------------------------------------
 
+-- can be replaced by the new torch.cat function
 local function joinTable(input,dim)
   local size = torch.LongStorage()
   local is_ok = false

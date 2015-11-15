@@ -533,3 +533,11 @@ end
 function SPP:cuda()
   return self:type('torch.CudaTensor')
 end
+
+function SPP:__tostring()
+  local str = torch.type(self)
+  str = str .. '\n  Image scales: [' .. table.concat(self.scales,', ')..']'
+  str = str .. '\n  Input area: ' .. self.inputArea
+  return str
+end
+
