@@ -1,7 +1,7 @@
 local SVMTrainer = torch.class('nnf.SVMTrainer')
 
 function SVMTrainer:__init(module,feat_provider)
-  self.dataset = feat_provider.dataset
+  --self.dataset = dataset
   self.module = module
   self.feat_provider = feat_provider
 
@@ -21,58 +21,54 @@ function SVMTrainer:__init(module,feat_provider)
   self.evict_thresh = -1.2
   self.hard_thresh = -1.0001
 
-  self.pos_feat_type = 'mixed' -- real, mixed, synthetic
+  self.pos_feat_type = 'real' -- real, mixed, synthetic
  
   self.synth_neg = true
 
-  self:getFeatureStats()
+  --self:getFeatureStats()
 end
 
 
-function SVMTrainer:getFeatureStats(feat_provider,module)
+function SVMTrainer:getFeatureStats(dataset,feat_provider,module)
 
-  if true then
-    self.mean_norm = 30.578503376687
+  if false then
+    self.mean_norm = 19.848824140978--30.578503376687
     return
   end
 
   local feat_provider = feat_provider or self.feat_provider
   local module = module or self.module
-  local dataset = feat_provider.dataset
+  local dataset = dataset
 
   local boxes_per_image = 200
   local num_images = math.min(dataset:size(),200)
 
   local valid_idx = torch.randperm(dataset:size())
   valid_idx = valid_idx[{{1,num_images}}]
- 
-  local fc5_feat = torch.FloatTensor()
-  local fc7_feat = torch.FloatTensor()
 
   local feat_cumsum = 0
   local feat_n = 0
+  local bboxes = torch.IntTensor(boxes_per_image,4)
   
   print('Getting feature stats')
   for i=1,num_images do
     xlua.progress(i,num_images)
     local img_idx = valid_idx[i]
+    local I = dataset:getImage(img_idx)
     local rec = dataset:attachProposals(img_idx)
     
     local num_bbox = math.min(boxes_per_image,rec:size())
 
-    fc5_feat:resize(num_bbox,unpack(self.feat_dim))
-    fc7_feat:resize(num_bbox,4096)
-
-    local bbox_idx = torch.randperm(rec:size())
+    local bbox_idx = torch.randperm(rec:size()):long()
     bbox_idx = bbox_idx[{{1,num_bbox}}]
 
-    for j=1,num_bbox do
-      local bbox_id = bbox_idx[j]
-      fc5_feat[j] = feat_provider:getFeature(img_idx,rec.boxes[bbox_id])
-    end
-     fc7_feat:copy(module:forward(fc5_feat:cuda()))
-     feat_n = feat_n + num_bbox
-     feat_cumsum = feat_cumsum + fc7_feat:pow(2):sum(2):sqrt():sum()
+    bboxes:index(rec.boxes,1,bbox_idx)
+    
+    local feat = feat_provider:getFeature(I,bboxes)
+    local final_feat = feat_provider:compute(module, feat)
+
+    feat_n = feat_n + num_bbox
+    feat_cumsum = feat_cumsum + final_feat:pow(2):sum(2):sqrt():sum()
   end
   self.mean_norm = feat_cumsum/feat_n
 end
@@ -82,10 +78,10 @@ function SVMTrainer:scaleFeatures(feat)
   feat:mul(target_norm/self.mean_norm)
 end
 
-function SVMTrainer:getPositiveFeatures(feat_provider,module)
+function SVMTrainer:getPositiveFeatures(dataset,feat_provider,module)
   local feat_provider = feat_provider or self.feat_provider
   local module = module or self.module
-  local dataset = feat_provider.dataset
+  local dataset = dataset
   module:evaluate()
   local positive_data = {}
   for cl_idx,cl_name in pairs(dataset.classes) do
@@ -98,6 +94,11 @@ function SVMTrainer:getPositiveFeatures(feat_provider,module)
   local not_done = torch.ByteTensor(dataset.num_classes):fill(1)
   for i=1,end_idx do
     xlua.progress(i,end_idx)
+    local I = dataset:getImage(i)
+    --local gt_boxes, gt_classes = dataset:getGTBoxes(i)
+
+
+
     local rec = dataset:attachProposals(i)
     local overlap = rec.overlap_class
     local is_gt = rec.gt
@@ -111,7 +112,10 @@ function SVMTrainer:getPositiveFeatures(feat_provider,module)
         for j=1,rec:size() do
           if overlap[j][cl_idx]==1 and is_gt[j]==1 then
             count = count + 1
-            fc5_feat[count] = feat_provider:getFeature(i,rec.boxes[j])
+            local fff = feat_provider:getFeature(I,rec.boxes[j])[1]
+            --print(fff:size())
+            --print(fc5_feat:size())
+            fc5_feat[count] = fff
           end
         end
         if num_pos > 0 then
@@ -133,15 +137,16 @@ function SVMTrainer:getPositiveFeatures(feat_provider,module)
   return positive_data
 end
 
-function SVMTrainer:sampleNegativeFeatures(ind,feat_provider,module)
+function SVMTrainer:sampleNegativeFeatures(ind,dataset,feat_provider,module)
 
   local feat_provider = feat_provider or self.feat_provider
-  local dataset = feat_provider.dataset
+  local dataset = dataset
   local module = module or self.module
   module:evaluate()
 collectgarbage()
   local first_time = self.first_time
 
+  local I = dataset:getImage(ind)
   local rec = dataset:attachProposals(ind)
   local overlap = rec.overlap_class
 
@@ -154,11 +159,9 @@ collectgarbage()
     caches[cl_name] = {X_neg = {},num_added = 0}
   end
 
-  fc5_feat:resize(rec:size(),unpack(self.feat_dim))
-  for j=1,rec:size() do
-    fc5_feat[j] = feat_provider:getFeature(ind,rec.boxes[j])
-  end
-  fc7_feat:resize(rec:size(),4096):copy(module:forward(fc5_feat:cuda()))
+  local feat = feat_provider:getFeature(I,rec.boxes)
+  local fc7_feat = feat_provider:compute(module, feat)
+
   self:scaleFeatures(fc7_feat)
 
   if first_time then
@@ -264,16 +267,16 @@ function SVMTrainer:addPositiveFeatures(feat_provider,module)
 end
 
 
-function SVMTrainer:train()
-  local dataset = self.dataset
+function SVMTrainer:train(dataset)
+  --local dataset = self.dataset
   
-  print('Experiment name: '..self.expname)
+  --print('Experiment name: '..self.expname)
 
   self.W = torch.Tensor(dataset.num_classes,4096)
   self.B = torch.Tensor(dataset.num_classes)
 
   --self:selectPositiveFeatures()
-  self:addPositiveFeatures()
+  --self:addPositiveFeatures()
   
   local caches = {}
   for cl_idx,cl_name in pairs(dataset.classes) do
@@ -313,7 +316,7 @@ function SVMTrainer:train()
         X = self:sampleNegativeFeatures(i-num_synth)
       end
     else
-      X = self:sampleNegativeFeatures(i)
+      X = self:sampleNegativeFeatures(i,dataset)
     end
 
     for cl_idx,cl_name in pairs(dataset.classes) do
@@ -396,7 +399,7 @@ function SVMTrainer:train()
     end
     first_time = false
   end
-  torch.save('/home/francisco/work/projects/cross_domain/cachedir/svm_models/svm_model,'..self.expname..'.t7',{W=self.W,B=self.B})
+  --torch.save('/home/francisco/work/projects/cross_domain/cachedir/svm_models/svm_model,'..self.expname..'.t7',{W=self.W,B=self.B})
   return caches--X_all
 end
 
