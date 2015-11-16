@@ -118,16 +118,29 @@ The constructor take the following optional arguments:
   * `imgs_per_batch`
 
 ### Examples
-Here we show a simple example demonstrating how to perform object detection given an image and a set of bounding boxes. 
-Run it using `qlua` for the visualization part.
+Here we show a simple example demonstrating how to perform object detection given an image and a set of bounding boxes.
+Run it using `qlua` for the visualization part. A pre-trained model for Fast-RCNN can be found [here](https://drive.google.com/file/d/0B-TTdm1WNtyba3I4Vm1hbFRSS2c/view?usp=sharing).
 ```lua
 require 'nnf'
 require 'image'
+require 'cudnn'
+require 'inn'
 require 'nn'
 
-model = torch.load('model.t7')
+-- load pre-trained Fast-RCNN model
+params = torch.load('cachedir/frcnn_alexnet.t7')
+loadModel = dofile 'models/frcnn_alexnet.lua'
+model = loadModel(params)
+
+model:add(nn.SoftMax())
+
+model:evaluate()
+model:cuda()
+
+-- Load an image
 I = image.lena()
 -- generate some random bounding boxes
+torch.manualSeed(500) -- fix seed for reproducibility
 bboxes = torch.Tensor(100,4)
 bboxes:select(2,1):random(1,I:size(3)/2)
 bboxes:select(2,2):random(1,I:size(2)/2)
@@ -137,8 +150,7 @@ bboxes:select(2,4):random(I:size(2)/2+1,I:size(2))
 image_transformer= nnf.ImageTransformer{mean_pix={102.9801,115.9465,122.7717},
                                         raw_scale = 255,
                                         swap = {3,2,1}}
-feat_provider = nnf.RCNN{crop_size=227,image_transformer=image_transformer,
-                         num_threads=6}
+feat_provider = nnf.FRCNN{image_transformer=image_transformer}
 
 detector = nnf.ImageDetect(model, feat_provider)
 scores, bboxes = detector:detect(I, bboxes)
@@ -146,9 +158,18 @@ scores, bboxes = detector:detect(I, bboxes)
 -- visualization
 dofile 'visualize_detections.lua'
 threshold = 0.5
-visualize_detections(I,bboxes,scores,threshold)
+-- classes from Pascal used for training the model
+cls = {'aeroplane','bicycle','bird','boat','bottle','bus','car',
+  'cat','chair','cow','diningtable','dog','horse','motorbike',
+  'person','pottedplant','sheep','sofa','train','tvmonitor'}
+
+w = visualize_detections(I,bboxes,scores,threshold,cls)
 
 ```
+This outputs the following
+
+![Lena](examples/example_frcnn_lena.jpg)
+
 
 For an illustration on how to use this code to train a detector, or to evaluate it on Pascal, see the [examples](http://github.com/fmassa/object-detection.torch/tree/master/examples).
 
@@ -210,4 +231,3 @@ git clone https://github.com/fmassa/object-detection.torch.git
 
 The default is to consider that the dataset is present in `datasets/VOCdevkit/VOC2007/`.
 The default location of bounding boxes `.mat` files (in RCNN format) is supposed to be in `data/selective_search_data/`.
-

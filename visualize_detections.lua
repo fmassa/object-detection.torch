@@ -17,6 +17,9 @@ function visualize_detections(im,boxes,scores,thresh,cl_names)
 
   local r = torch.range(1,boxes:size(1)):long()
   local rr = r[idx_thresh]
+  if rr:numel() == 0 then
+    error('No detections with a score greater than the specified threshold')
+  end
   local boxes_thresh = boxes:index(1,rr)
   
   local keep = nms(torch.cat(boxes_thresh:float(),max_score:float(),2),0.3)
