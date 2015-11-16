@@ -55,4 +55,5 @@ function visualize_detections(im,boxes,scores,thresh,cl_names)
   w:setcolor("red")
   w:setlinewidth(2)
   w:stroke()
+  return w
 end

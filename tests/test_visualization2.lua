@@ -33,6 +33,10 @@ boxes = ds:getROIBoxes(im_idx)
 
 scores,bb = detect:detect(I,boxes)
 
-visualize_detections(I,boxes,scores,0.5,ds.classes)
+w = visualize_detections(I,boxes,scores,0.5,ds.classes)
 
+Im = w:image()
+II = Im:toFloatTensor()
+
+image.save('example_frcnn.jpg',II)
 
