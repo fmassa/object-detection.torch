@@ -7,10 +7,10 @@ local env = require 'argcheck.env' -- retrieve argcheck environement
 -- which can be overrided by the user
 function env.istype(obj, typename)
   if typename == 'DataSet' then
-    return obj._isDataSet
+    return obj and obj._isDataSet
   end
   if typename == 'FeatureProvider' then
-    return obj._isFeatureProvider
+    return obj and obj._isFeatureProvider
   end
   return torch.type(obj) == typename
 end
