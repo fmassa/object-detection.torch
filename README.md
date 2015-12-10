@@ -137,6 +137,15 @@ model:add(nn.SoftMax())
 model:evaluate()
 model:cuda()
 
+-- prepare detector
+image_transformer= nnf.ImageTransformer{mean_pix={102.9801,115.9465,122.7717},
+                                        raw_scale = 255,
+                                        swap = {3,2,1}}
+feat_provider = nnf.FRCNN{image_transformer=image_transformer}
+feat_provider:evaluate() -- testing mode
+
+detector = nnf.ImageDetect(model, feat_provider)
+
 -- Load an image
 I = image.lena()
 -- generate some random bounding boxes
@@ -147,12 +156,7 @@ bboxes:select(2,2):random(1,I:size(2)/2)
 bboxes:select(2,3):random(I:size(3)/2+1,I:size(3))
 bboxes:select(2,4):random(I:size(2)/2+1,I:size(2))
 
-image_transformer= nnf.ImageTransformer{mean_pix={102.9801,115.9465,122.7717},
-                                        raw_scale = 255,
-                                        swap = {3,2,1}}
-feat_provider = nnf.FRCNN{image_transformer=image_transformer}
-
-detector = nnf.ImageDetect(model, feat_provider)
+-- detect !
 scores, bboxes = detector:detect(I, bboxes)
 
 -- visualization
