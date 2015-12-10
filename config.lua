@@ -1,3 +1,4 @@
+require 'nnf'
 
 local configs = {}
 
@@ -8,6 +9,28 @@ local image_transformer_params = {
 }
 
 configs.image_transformer_params = image_transformer_params
+
+configs.datasetDir = 'datasets/VOCdevkit'
+configs.roidbDir   = 'data/selective_search_data'
+
+--------------------------------------------------------------------------------
+-- Training Parameters
+--------------------------------------------------------------------------------
+
+local train_params = {
+  batch_size = 16,--128,
+  fg_fraction = 0.25,
+  fg_threshold = 0.5,
+  bg_threshold = {0.0,0.5},
+  do_flip = true,
+}
+
+configs.train_params = train_params
+
+--------------------------------------------------------------------------------
+-- Feature Provider Parameters
+--------------------------------------------------------------------------------
+
 configs.algo = {}
 
 --------------------------------------------------------------------------------
@@ -18,23 +41,16 @@ local fp_params = {
   crop_size         = 227,
   padding           = 16,
   use_square        = false,
-  image_transformer = image_transformer
 }
 local bp_params = {
   iter_per_batch = 100,
   nTimesMoreData = 10,
-  batch_size = opt.batch_size,
-  fg_fraction = opt.fg_frac,
-  fg_threshold = 0.5,
-  bg_threshold = {0.0,0.5},
-  do_flip = true,
---  batch_dim = {3,fp_params.crop_size,fp_params.crop_size},
 }
 
 local RCNN = {
   fp_params=fp_params,
   bp_params=bp_params,
-  bp = nnf.BatchProvider
+  bp = nnf.BatchProviderRC
 }
 
 configs.algo.RCNN = RCNN
@@ -51,7 +67,6 @@ local feat_dim = {num_chns*pooled_size}
 
 local fp_params = {
   scales            = {480,576,688,874,1200},
-  randomscale       = true,
   sz_conv_standard  = 13,
   step_standard     = 16,
   offset0           = 21,
@@ -59,23 +74,16 @@ local fp_params = {
   inputArea         = 224^2,
   pooling_scales    = pooling_scales,
   num_feat_chns     = num_chns,
-  image_transformer = image_transformer
 }
 local bp_params = {
   iter_per_batch = 500,
   nTimesMoreData = 10,
-  batch_size = opt.batch_size,
-  fg_fraction = opt.fg_frac,
-  fg_threshold = 0.5,
-  bg_threshold = {0.1,0.5},
-  do_flip = true,
---  batch_dim = feat_dim,
 }
 
 local SPP = {
   fp_params=fp_params,
   bp_params=bp_params,
-  bp = nnf.BatchProvider
+  bp = nnf.BatchProviderRC
 }
 
 configs.algo.SPP = SPP
@@ -87,21 +95,15 @@ configs.algo.SPP = SPP
 local fp_params = {
   scale             = {600},
   max_size          = 1000,
-  image_transformer = image_transformer
 }
 local bp_params = {
   imgs_per_batch = 2,
-  batch_size = opt.batch_size,
-  fg_fraction = opt.fg_frac,
-  fg_threshold = 0.5,
-  bg_threshold = {0.0,0.5},
-  do_flip = true,
 }
 
 local FRCNN = {
   fp_params=fp_params,
   bp_params=bp_params,
-  bp = nnf.BatchProviderROI
+  bp = nnf.BatchProviderIC
 }
 
 configs.algo.FRCNN = FRCNN

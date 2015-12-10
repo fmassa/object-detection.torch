@@ -1,78 +1,65 @@
 --------------------------------------------------------------------------------
 -- Prepare data model
 --------------------------------------------------------------------------------
-paths.mkdir(opt.save)
 
-trainCache = paths.concat(opt.save_base,'trainCache.t7')
-testCache = paths.concat(opt.save_base,'testCache.t7')
+local trainCache = paths.concat(rundir,'trainCache.t7')
+--testCache = paths.concat(opt.save_base,'testCache.t7')
 
-local pooler
-local feat_dim
---[[
-if opt.algo == 'SPP' then
-  local conv_list = features:findModules(opt.backend..'.SpatialConvolution')
-  local num_chns = conv_list[#conv_list].nOutputPlane
-  pooler = model:get(2):clone():float()
-  local pyr = torch.Tensor(pooler.pyr):t()
-  local pooled_size = pyr[1]:dot(pyr[2])
-  feat_dim = {num_chns*pooled_size}
-elseif opt.algo == 'RCNN' then
-  feat_dim = {3,227,227}
-end
---]]
+local config = paths.dofile('config.lua')
 
-image_transformer = nnf.ImageTransformer{mean_pix=image_mean}
-
+image_transformer = nnf.ImageTransformer(config.image_transformer_params)
 
 local FP        = nnf[opt.algo]
 local fp_params = config.algo[opt.algo].fp_params
 local bp_params = config.algo[opt.algo].bp_params
 local BP        = config.algo[opt.algo].bp
 
+local train_params = config.train_params
+
+-- add common parameters
+fp_params.image_transformer = image_transformer
+for k,v in pairs(train_params) do
+  bp_params[k] = v
+end
+
+-------------------------------------------------------------------------------
+-- Create structures
+--------------------------------------------------------------------------------
+
+ds_train = nnf.DataSetPascal{
+  image_set='trainval',
+  year=2007,--opt.year,
+  datadir=config.datasetDir,
+  roidbdir=config.roidbDir
+}
+
+feat_provider = FP(fp_params)
+feat_provider:training()
+
+bp_params.dataset = ds_train
+bp_params.feat_provider = feat_provider
+batch_provider = BP(bp_params)
+
 if paths.filep(trainCache) then
   print('Loading train metadata from cache')
-  batch_provider = torch.load(trainCache)
-  feat_provider = batch_provider.feat_provider
-  ds_train = feat_provider.dataset
-  feat_provider.model = features
+  local metadata = torch.load(trainCache)
+  batch_provider.bboxes = metadata
 else
-  ds_train = nnf.DataSetPascal{image_set='trainval',classes=classes,year=opt.year,
-                         datadir=opt.datadir,roidbdir=opt.roidbdir}
-  
-
-  feat_provider = FP(fp_params)
-  batch_provider = BP(bp_params)
   batch_provider:setupData()
-
-  torch.save(trainCache,batch_provider)
-  feat_provider.model = features
+  torch.save(trainCache, batch_provider.bboxes)
 end
 
-if paths.filep(testCache) then
-  print('Loading test metadata from cache')
-  batch_provider_test = torch.load(testCache)
-  feat_provider_test = batch_provider_test.feat_provider
-  ds_test = feat_provider_test.dataset
-  feat_provider_test.model = features
-else
-  ds_test = nnf.DataSetPascal{image_set='test',classes=classes,year=opt.year,
-                              datadir=opt.datadir,roidbdir=opt.roidbdir}
+-- test
+ds_test = nnf.DataSetPascal{
+  image_set='test',
+  year=2007,--opt.year,
+  datadir=config.datasetDir,
+  roidbdir=config.roidbDir
+}
 
-
-  feat_provider_test = FP(fp_params)
-  -- disable flip ?
-  bp_params.do_flip = false
-  batch_provider_test = BP(bp_params)
-
-  batch_provider_test:setupData()
-  
-  torch.save(testCache,batch_provider_test)
-  feat_provider_test.model = features
-end
-
--- compute feature cache
-
-features = nil
-model = nil
+-- only needed because of SPP
+-- could be the same as the one for training
+--feat_provider_test = FP(fp_params)
+--feat_provider_test:evaluate()
 
 collectgarbage()
