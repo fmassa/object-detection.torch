@@ -175,7 +175,7 @@ This outputs the following
 ![Lena](examples/example_frcnn_lena.jpg)
 
 
-For an illustration on how to use this code to train a detector, or to evaluate it on Pascal, see the [examples](http://github.com/fmassa/object-detection.torch/tree/master/examples).
+For an illustration on how to use this code to train a detector, or to evaluate it on Pascal, see the [examples](http://github.com/fmassa/object-detection.torch/tree/refactoring/examples).
 
 #### Bounding box proposals
 Note that this repo doesn't contain code for generating bounding box proposals. For the moment, they are pre-computed and loaded at run time.
