@@ -1,6 +1,6 @@
 local function loadModel(params,backend)
 
-  backend = backend or nn
+  backend = backend or cudnn
 
   local features   = nn.Sequential()
   local classifier = nn.Sequential()
