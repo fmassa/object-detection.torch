@@ -77,6 +77,21 @@ local function VOCap(rec,prec)
   return ap
 end
 
+local function VOC2007ap(rec,prec)
+  local ap = 0
+  for t=0,1,0.1 do
+    local c = prec[rec:ge(t)]
+    local p
+    if c:numel() > 0 then
+      p = torch.max(c)
+    else
+      p = 0
+    end
+    ap=ap+p/11
+  end
+  return ap
+end
+
 --------------------------------------------------------------------------------
 
 local function boxoverlap(a,b)
