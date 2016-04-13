@@ -5,6 +5,7 @@ cmd:text('Example on how to train/test a RCNN based object detector on Pascal')
 cmd:text('')
 cmd:text('Options:')
 cmd:option('-name',      'rcnn-example', 'base name')
+cmd:option('-modelpath', '',             'path to the pre-trained model')
 cmd:option('-lr',        1e-3,           'learning rate')
 cmd:option('-num_iter',  40000,          'number of iterations')
 cmd:option('-disp_iter', 100,            'display every n iterations')
@@ -16,7 +17,10 @@ cmd:option('-numthreads',6,              'number of threads')
 
 opt = cmd:parse(arg or {})
 
-exp_name = cmd:string(opt.name, opt, {name=true, gpu=true, numthreads=true})
+assert(paths.filep(opt.modelpath), 'need to provide the path for the pre-trained model')
+
+exp_name = cmd:string(opt.name, opt, {name=true, gpu=true, numthreads=true,
+                                      modelpath=true})
 
 rundir = '../cachedir/'..exp_name
 paths.mkdir(rundir)
@@ -49,8 +53,13 @@ torch.setnumthreads(opt.numthreads)
 --------------------------------------------------------------------------------
 -- define model and criterion
 --------------------------------------------------------------------------------
-local createModel = paths.dofile('../models/alexnet.lua')
-model = createModel()
+-- load pre-trained model for finetuning
+-- should already have the right number of outputs in the last layer,
+-- which can be done by removing the last layer and replacing it by a new one
+-- for example:
+-- pre_trained_model:remove() -- remove last layer
+-- pre_trained_model:add(nn.Linear(4096,21)) -- add new layer
+model = torch.load(opt.modelpath)
 
 criterion = nn.CrossEntropyCriterion()
 
