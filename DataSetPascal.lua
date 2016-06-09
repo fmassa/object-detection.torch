@@ -1,13 +1,15 @@
 local matio = require 'matio'
-local argcheck = dofile'argcheck.lua'--require 'argcheck'
+local argcheck = require 'objdet.argcheck'--require 'argcheck'
 local xml = require 'xml'
-local utilities = paths.dofile('utils.lua')
+local utilities = require 'objdet.utils'
 local concat = utilities.concat
 local boxoverlap = utilities.boxoverlap
 
 matio.use_lua_strings = true
 
-local DataSetPascal,parent = torch.class('nnf.DataSetPascal', 'nnf.DataSetDetection')
+local objdet = require 'objdet.env'
+
+local DataSetPascal,parent = torch.class('objdet.DataSetPascal', 'objdet.DataSetDetection', objdet)
 
 local function lines_from(file)
 -- get all lines from a file, returns an empty 

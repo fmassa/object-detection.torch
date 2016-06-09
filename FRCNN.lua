@@ -1,6 +1,7 @@
-local flipBoundingBoxes = paths.dofile('utils.lua').flipBoundingBoxes
-local recursiveResizeAsCopyTyped = paths.dofile('utils.lua').recursiveResizeAsCopyTyped
-local FRCNN = torch.class('nnf.FRCNN')
+local objdet = require 'objdet.env'
+local flipBoundingBoxes = require 'objdet.utils'.flipBoundingBoxes
+local recursiveResizeAsCopyTyped = require 'objdet.utils'.recursiveResizeAsCopyTyped
+local FRCNN = torch.class('objdet.FRCNN', objdet)
 FRCNN._isFeatureProvider = true
 
 local argcheck = require 'argcheck'
@@ -20,8 +21,8 @@ local initcheck = argcheck{
    default=224^2,
    help="input area of the bounding box"},
   {name="image_transformer",
-   type="nnf.ImageTransformer",
-   default=nnf.ImageTransformer{},
+   type="objdet.ImageTransformer",
+   default=objdet.ImageTransformer{},
    help="Class to preprocess input images"},
 }
 

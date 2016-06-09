@@ -1,5 +1,6 @@
-local ImageDetect = torch.class('nnf.ImageDetect')
-local recursiveResizeAsCopyTyped = paths.dofile('utils.lua').recursiveResizeAsCopyTyped
+local objdet = require 'objdet.env'
+local ImageDetect = torch.class('objdet.ImageDetect',objdet)
+local recursiveResizeAsCopyTyped = require('objdet.utils').recursiveResizeAsCopyTyped
 
 function ImageDetect:__init(model, feat_provider)
   self.model = model

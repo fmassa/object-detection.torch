@@ -1,13 +1,14 @@
 local hdf5 = require 'hdf5'
-local flipBoundingBoxes = paths.dofile('utils.lua').flipBoundingBoxes
+local flipBoundingBoxes = require 'objdet.utils'.flipBoundingBoxes
 
-local SPP = torch.class('nnf.SPP')
+local objdet = require 'objdet.env'
+local SPP = torch.class('objdet.SPP', objdet)
 SPP._isFeatureProvider = true
 
 -- argcheck crashes with that many arguments, and using unordered
 -- doesn't seems practical
 
-local argcheck = paths.dofile('argcheck.lua')--require 'argcheck'
+local argcheck = require 'objdet.argcheck'--require 'argcheck'
 local initcheck = argcheck{
   pack=true,
   {name="model",
@@ -51,7 +52,7 @@ local initcheck = argcheck{
    help="input area"},
   {name="image_transformer",
    type="nnf.ImageTransformer",
-   default=nnf.ImageTransformer{},
+   default=objdet.ImageTransformer{},
    help="Class to preprocess input images"},
   {name="use_cache",
    type="boolean",
@@ -62,7 +63,6 @@ local initcheck = argcheck{
    opt=true,
    help=""},
 }
-
 
 
 function SPP:__init(...)

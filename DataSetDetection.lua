@@ -1,8 +1,10 @@
-local utilities = paths.dofile('utils.lua')
+local utilities = require 'objdet.utils'
 local concat = utilities.concat
 local boxoverlap = utilities.boxoverlap
 
-local DataSetDetection = torch.class('nnf.DataSetDetection')
+local objdet = require 'objdet.env'
+
+local DataSetDetection = torch.class('objdet.DataSetDetection', objdet)
 DataSetDetection._isDataSet = true
 
 function DataSetDetection:__init()

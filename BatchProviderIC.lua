@@ -1,4 +1,5 @@
-local BatchProvider, parent = torch.class('nnf.BatchProviderIC','nnf.BatchProviderBase')
+local objdet = require 'objdet.env'
+local BatchProvider, parent = torch.class('objdet.BatchProviderIC','objdet.BatchProviderBase', objdet)
 
 local argcheck = require 'argcheck'
 
@@ -24,7 +25,7 @@ local initcheck = argcheck{
    help="A dataset class" 
   },
   {name="feat_provider",
-   type="nnf.FRCNN",
+   type="objdet.FRCNN",
    help="A feat provider class" 
   },
   {name="batch_size",

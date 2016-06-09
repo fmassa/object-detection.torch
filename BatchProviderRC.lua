@@ -1,5 +1,6 @@
+local objdet = require 'objdet.env'
 local BatchProvider,parent = 
-                    torch.class('nnf.BatchProviderRC','nnf.BatchProviderBase')
+                    torch.class('objdet.BatchProviderRC','objdet.BatchProviderBase',objdet)
 
 
 local argcheck = require 'argcheck'

@@ -1,4 +1,5 @@
-local flipBoundingBoxes = paths.dofile('utils.lua').flipBoundingBoxes
+local objdet = require 'objdet.env'
+local flipBoundingBoxes = require 'objdet.utils'.flipBoundingBoxes
 
 local argcheck = require 'argcheck'
 local initcheck = argcheck{
@@ -18,7 +19,7 @@ local initcheck = argcheck{
    help="force square crops"},
   {name="image_transformer",
    type="nnf.ImageTransformer",
-   default=nnf.ImageTransformer{},
+   default=objdet.ImageTransformer{},
    help="Class to preprocess input images"},
   {name="max_batch_size",
    type="number",
@@ -39,7 +40,7 @@ local initcheck = argcheck{
 }
 
 
-local RCNN = torch.class('nnf.RCNN')
+local RCNN = torch.class('objdet.RCNN', objdet)
 RCNN._isFeatureProvider = true
 
 local function RCNNCrop(output,I,box,crop_size,padding,use_square,crop_buffer)

@@ -1,6 +1,7 @@
 --local json = require 'dkjson'
+local objdet = require 'objdet.env'
 
-local DataSetCOCO,parent = torch.class('nnf.DataSetCOCO', 'nnf.DataSetDetection')
+local DataSetCOCO,parent = torch.class('objdet.DataSetCOCO', 'objdet.DataSetDetection', objdet)
 
 function DataSetCOCO:__init(annFile)
   self.image_set = nil

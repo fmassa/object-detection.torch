@@ -1,4 +1,5 @@
-local ImageTransformer = torch.class('nnf.ImageTransformer')
+local objdet = require 'objdet.env'
+local ImageTransformer = torch.class('objdet.ImageTransformer', objdet)
 
 function ImageTransformer:__init(...)
   self.mean_pix = {128/255,128/255,128/255}

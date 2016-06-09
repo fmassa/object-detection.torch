@@ -1,4 +1,4 @@
-dofile 'test_utils.lua'
+paths.dofile 'test_utils.lua'
 
 detect1 = nnf.ImageDetect(model1,fp1)
 detect = nnf.ImageDetect(model,fp2)
@@ -8,13 +8,16 @@ detect = nnf.ImageDetect(model,fp2)
 -- define batch providers
 --------------------------------------------------------------------------------
 
-bp1 = nnf.BatchProvider{dataset=ds,feat_provider=fp1}
+bp1 = nnf.BatchProviderRC{dataset=ds,feat_provider=fp1}
 bp1.nTimesMoreData = 2
 bp1.iter_per_batch = 10
-bp2 = nnf.BatchProviderROI{dataset=ds,feat_provider=fp2}
+bp2 = nnf.BatchProviderIC{dataset=ds,feat_provider=fp2}
 
-bp1.bboxes = torch.load('tests/bproibox.t7')
-bp2.bboxes = torch.load('tests/bproibox.t7')
+--bp1.bboxes = torch.load('tests/bproibox.t7')
+--bp2.bboxes = torch.load('tests/bproibox.t7')
+bp1:setupData()
+bp2.bboxes = bp1.bboxes
+--bp2:setupData()
 
 print('test1')
 b,t = bp1:getBatch()

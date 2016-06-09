@@ -1,4 +1,5 @@
 local argcheck = require 'argcheck'
+local objdet = require 'objdet.env'
 
 local function createWindowBase(rec,i,j,is_bg)
   local label = is_bg == true and 0+1 or rec.label[j]+1
@@ -69,7 +70,7 @@ local initcheck = argcheck{
 }
 --]]
 
-local BatchProviderBase = torch.class('nnf.BatchProviderBase')
+local BatchProviderBase = torch.class('objdet.BatchProviderBase', objdet)
 
 function BatchProviderBase:__init(...)
   

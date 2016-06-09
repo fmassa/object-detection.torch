@@ -1,13 +1,15 @@
-require 'nnf'
+nnf = require 'objdet'
 require 'nn'
 
 function getDS()
-  local dt = torch.load('pascal_2007_train.t7')
-  local ds = nnf.DataSetPascal{image_set='train',
+  --local dt = torch.load('pascal_2007_train.t7')
+  --local ds = nnf.DataSetPascal{image_set='train',
+  local ds = nnf.DataSetPascal{image_set='trainval',
                              datadir='/home/francisco/work/datasets/VOCdevkit',
                              roidbdir='/home/francisco/work/datasets/rcnn/selective_search_data'
                              }
-  ds.roidb = dt.roidb
+  --ds.roidb = dt.roidb
+  ds:loadROIDB()
   return ds
 end
 
@@ -40,7 +42,7 @@ ds = getDS()
 
 model1, model, features, classifier = getModel()
   
-fp1 = nnf.RCNN{}
+fp1 = nnf.RCNN{num_threads=1}
 fp2 = nnf.FRCNN{}
 fp3 = nnf.SPP{model=features}
 fp3.use_cache = false

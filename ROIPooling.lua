@@ -1,4 +1,5 @@
-local ROIPooling,parent = torch.class('nnf.ROIPooling','nn.Module')
+local objdet = require 'objdet.env'
+local ROIPooling,parent = torch.class('objdet.ROIPooling','nn.Module', objdet)
 
 function ROIPooling:__init(W,H)
   parent.__init(self)

@@ -77,7 +77,7 @@ end
 --------------------------------------------------------------------------------
 
 local function keep_top_k(boxes,top_k)
-  local X = joinTable(boxes,1)
+  local X = torch.cat(boxes,1)
   if X:numel() == 0 then
     return
   end
