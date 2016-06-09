@@ -119,16 +119,17 @@ function FRCNN:projectImageROIs(im_rois,scales,do_flip,imgs_size)
       end
     end
   else -- not yet tested
-    error('Multi-scale testing not yet tested')
+    --error('Multi-scale testing not yet tested')
     local scales = torch.FloatTensor(scales)
-    im_rois = im_rois[1]
+    im_rois = im_rois[1]:float()
     local widths = im_rois[{{},3}] - im_rois[{{},1}] + 1
     local heights = im_rois[{{},4}] - im_rois[{{}, 2}] + 1
 
-    local areas = widths * heights
-    local scaled_areas = areas:view(-1,1) * scales:view(1,-1):pow(2)
-    local diff_areas = scaled_areas:add(-1,self.inputArea):abs() -- no memory copy
+    local areas = torch.cmul(widths, heights)
+    local scaled_areas = torch.mm(areas:view(-1,1), torch.pow(scales:view(1,-1),2)) -- use torch.ger ?
+    local diff_areas = scaled_areas:add(-self.inputArea):abs() -- no memory copy
     local levels = select(2, diff_areas:min(2))
+    levels = levels:squeeze(2) -- replace by levels:squeeze(2)
 
     local num_boxes = im_rois:size(1)
     rois:resize(num_boxes,5)
@@ -172,7 +173,7 @@ function FRCNN:postProcess(im,boxes,output)
 end
 
 function FRCNN:compute(model, inputs)
-  local ttype = model.output:type() -- fix when doing bbox regression
+  local ttype = model:type()
   self.inputs,inputs = recursiveResizeAsCopyTyped(self.inputs,inputs,ttype)
   return model:forward(self.inputs)
 end
