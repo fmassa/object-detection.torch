@@ -248,7 +248,7 @@ function RCNN:compute(model,inputs)
 
   self.output = self.output or inputs.new()
 
-  local ttype = model.output:type()
+  local ttype = model:type()
   self.inputs = self.inputs or torch.Tensor():type(ttype)
 
   for idx, f in ipairs(inputs_s) do

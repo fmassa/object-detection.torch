@@ -1,10 +1,11 @@
 require 'nn'
 require 'optim'
 require 'xlua'
-local utils = paths.dofile('utils.lua')
+local objdet = require 'objdet.env'
+local utils = require('objdet.utils')
 local recursiveResizeAsCopyTyped = utils.recursiveResizeAsCopyTyped
 
-local Trainer = torch.class('nnf.Trainer')
+local Trainer = torch.class('objdet.Trainer',objdet)
 
 function Trainer:__init(module,criterion,batch_provider,optimState)
   

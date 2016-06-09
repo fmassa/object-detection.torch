@@ -1,4 +1,5 @@
-local SVMTrainer = torch.class('nnf.SVMTrainer')
+local objdet = require 'objdet.env'
+local SVMTrainer = torch.class('objdet.SVMTrainer',objdet)
 
 function SVMTrainer:__init(module,feat_provider)
   --self.dataset = dataset

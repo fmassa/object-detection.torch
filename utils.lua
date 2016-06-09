@@ -2,34 +2,6 @@
 -- utility functions for the evaluation part
 --------------------------------------------------------------------------------
 
--- can be replaced by the new torch.cat function
-local function joinTable(input,dim)
-  local size = torch.LongStorage()
-  local is_ok = false
-  for i=1,#input do
-    local currentOutput = input[i]
-    if currentOutput:numel() > 0 then
-      if not is_ok then
-        size:resize(currentOutput:dim()):copy(currentOutput:size())
-        is_ok = true
-      else
-        size[dim] = size[dim] + currentOutput:size(dim)
-      end    
-    end
-  end
-  local output = input[1].new():resize(size)
-  local offset = 1
-  for i=1,#input do
-    local currentOutput = input[i]
-    if currentOutput:numel() > 0 then
-      output:narrow(dim, offset,
-                    currentOutput:size(dim)):copy(currentOutput)
-      offset = offset + currentOutput:size(dim)
-    end
-  end
-  return output
-end
-
 local function recursiveResizeAsCopyTyped(t1,t2,type)
   if torch.type(t2) == 'table' then
     t1 = (torch.type(t1) == 'table') and t1 or {t1}
@@ -122,11 +94,26 @@ local function VOCap(rec,prec)
   return ap
 end
 
+local function VOC2007ap(rec,prec)
+  local ap = 0
+  for t=0,1,0.1 do
+    local c = prec[rec:ge(t)]
+    local p
+    if c:numel() > 0 then
+      p = torch.max(c)
+    else
+      p = 0
+    end
+    ap=ap+p/11
+  end
+  return ap
+end
+
 --------------------------------------------------------------------------------
 
 local function boxoverlap(a,b)
   local b = b.xmin and {b.xmin,b.ymin,b.xmax,b.ymax} or b
-    
+
   local x1 = a:select(2,1):clone()
   x1[x1:lt(b[1])] = b[1] 
   local y1 = a:select(2,2):clone()
@@ -135,20 +122,20 @@ local function boxoverlap(a,b)
   x2[x2:gt(b[3])] = b[3]
   local y2 = a:select(2,4):clone()
   y2[y2:gt(b[4])] = b[4]
-  
+
   local w = x2-x1+1;
   local h = y2-y1+1;
   local inter = torch.cmul(w,h):float()
   local aarea = torch.cmul((a:select(2,3)-a:select(2,1)+1) ,
-                           (a:select(2,4)-a:select(2,2)+1)):float()
+  (a:select(2,4)-a:select(2,2)+1)):float()
   local barea = (b[3]-b[1]+1) * (b[4]-b[2]+1);
-  
+
   -- intersection over union overlap
   local o = torch.cdiv(inter , (aarea+barea-inter))
   -- set invalid entries to 0 overlap
   o[w:lt(0)] = 0
   o[h:lt(0)] = 0
-  
+
   return o
 end
 
@@ -241,65 +228,6 @@ end
 
 
 --------------------------------------------------------------------------------
--- data preparation
---------------------------------------------------------------------------------
-
--- Caffe models are in BGR format, and they suppose the images range from 0-255.
--- This function modifies the model read by loadcaffe to use it in torch format
--- location is the postion of the first conv layer in the module. If you have
--- nested models (like sequential inside sequential), location should be a
--- table with as many elements as the depth of the network.
-local function convertCaffeModelToTorch(model,location)
-  local location = location or {1}
-  local m = model
-  for i=1,#location do
-    m = m:get(location[i])
-  end
-  local weight = m.weight
-  local weight_clone = weight:clone()
-  local nchannels = weight:size(2)
-  for i=1,nchannels do
-    weight:select(2,i):copy(weight_clone:select(2,nchannels+1-i))
-  end
-  weight:mul(255)
-end
-
-
---------------------------------------------------------------------------------
--- nn
---------------------------------------------------------------------------------
-
-local function reshapeLastLinearLayer(model,nOutput)
-  local layers = model:findModules('nn.Linear')
-  local layer = layers[#layers]
-  local nInput = layer.weight:size(2)
-  layer.gradBias:resize(nOutput):zero()
-  layer.gradWeight:resize(nOutput,nInput):zero()
-  layer.bias:resize(nOutput)
-  layer.weight:resize(nOutput,nInput)
-  layer:reset()
-end
-
--- borrowed from https://github.com/soumith/imagenet-multiGPU.torch/blob/master/train.lua
--- clear the intermediate states in the model before saving to disk
--- this saves lots of disk space
-local function sanitize(net)
-  local list = net:listModules()
-  for _,val in ipairs(list) do
-    for name,field in pairs(val) do
-      if torch.type(field) == 'cdata' then val[name] = nil end
-      if name == 'homeGradBuffers' then val[name] = nil end
-      if name == 'input_gpu' then val['input_gpu'] = {} end
-      if name == 'gradOutput_gpu' then val['gradOutput_gpu'] = {} end
-      if name == 'gradInput_gpu' then val['gradInput_gpu'] = {} end
-      if (name == 'output' or name == 'gradInput') then
-        val[name] = field.new()
-      end
-    end
-  end
-end
-
---------------------------------------------------------------------------------
 -- packaging
 --------------------------------------------------------------------------------
 
@@ -308,9 +236,7 @@ local utils = {}
 utils.keep_top_k = keep_top_k
 utils.VOCevaldet = VOCevaldet
 utils.VOCap = VOCap
-utils.convertCaffeModelToTorch = convertCaffeModelToTorch
-utils.reshapeLastLinearLayer = reshapeLastLinearLayer
-utils.sanitize = sanitize
+utils.VOC2007ap = VOC2007ap
 utils.recursiveResizeAsCopyTyped = recursiveResizeAsCopyTyped
 utils.flipBoundingBoxes = flipBoundingBoxes
 utils.concat = concat
