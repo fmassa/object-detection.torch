@@ -103,13 +103,29 @@ function BatchProvider:permuteIdx()
       end
     end
   end
-  local do_flip = torch.FloatTensor(imgs_per_batch):random(0,1)
+  local do_flip = torch.FloatTensor(imgs_per_batch)
+  if self.do_flip then
+    do_flip:random(0,1)
+  else
+    do_flip:zero()
+  end
   local opts = {img_idx=img_idx,img_idx_end=img_idx_end,do_flip=do_flip}
   return fg_windows,bg_windows,opts
 
 end
 
-function BatchProvider:selectBBoxes(fg_windows,bg_windows)
+function BatchProvider:setLabel(dd, do_flip)
+  -- by default, returns as labels everything that is after the
+  -- 5th position.
+  return dd[{{5,-1}}]:totable()
+end
+
+function BatchProvider:prepareTarget(labels)
+  return torch.FloatTensor(labels)
+end
+
+-- improve later, remove redundant things and make more generic
+function BatchProvider:selectBBoxes(fg_windows, bg_windows, do_flip)
   local fg_num_each  = torch.round(self.fg_num_each/self.imgs_per_batch)
   local bg_num_each  = torch.round(self.bg_num_each/self.imgs_per_batch)
 
@@ -122,9 +138,9 @@ function BatchProvider:selectBBoxes(fg_windows,bg_windows)
     for i=1,end_idx do
       local curr_idx = bg_windows[im][window_idx[i] ][1]
       local position = bg_windows[im][window_idx[i] ][2]
-      local dd = self.bboxes[curr_idx][0][position][{{2,6}}]
-      table.insert(bbox,{dd[1],dd[2],dd[3],dd[4]})
-      table.insert(labels,dd[5])
+      local dd = self.bboxes[curr_idx][0][position][{{2,-1}}]
+      table.insert(bbox, {dd[1],dd[2],dd[3],dd[4]})
+      table.insert(labels, self:setLabel(dd, do_flip[im]))
     end
 
     window_idx = torch.randperm(#fg_windows[im])
@@ -132,13 +148,13 @@ function BatchProvider:selectBBoxes(fg_windows,bg_windows)
     for i=1,end_idx do
       local curr_idx = fg_windows[im][window_idx[i] ][1]
       local position = fg_windows[im][window_idx[i] ][2]
-      local dd = self.bboxes[curr_idx][1][position][{{2,6}}]
-      table.insert(bbox,{dd[1],dd[2],dd[3],dd[4]})
-      table.insert(labels,dd[5])
+      local dd = self.bboxes[curr_idx][1][position][{{2,-1}}]
+      table.insert(bbox, {dd[1],dd[2],dd[3],dd[4]})
+      table.insert(labels, self:setLabel(dd, do_flip[im]))
     end
-    table.insert(bboxes,torch.FloatTensor(bbox))
+    table.insert(bboxes, torch.FloatTensor(bbox))
   end
-  labels = torch.IntTensor(labels)
+  labels = self:prepareTarget(labels)
   return bboxes, labels
 end
 
@@ -159,8 +175,8 @@ function BatchProvider:getBatch()
   for i=1,opts.img_idx:size(1) do
     table.insert(imgs,dataset:getImage(opts.img_idx[i]))
   end
-  local boxes,labels = self:selectBBoxes(fg_windows,bg_windows)
-  self.batches = self.feat_provider:getFeature(imgs,boxes,opts.do_flip)
+  local boxes,labels = self:selectBBoxes(fg_windows, bg_windows, opts.do_flip)
+  self.batches = self.feat_provider:getFeature(imgs, boxes, opts.do_flip)
 
   targets:resize(labels:size()):copy(labels)
   

@@ -210,7 +210,7 @@ function Tester:test(iteration)
   self:finalPrunning(aboxes, thresh)
 
   save_file = paths.concat(pathfolder, 'boxes_'..
-                           dataset.dataset_name..self.suffix)
+                           dataset.dataset_name..self.suffix .. '.t7')
   torch.save(save_file, aboxes)
 
   local res = self:evaluate(aboxes)

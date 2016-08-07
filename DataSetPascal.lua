@@ -214,8 +214,18 @@ function DataSetPascal:loadROIDB()
   
   assert(roidbfile and paths.filep(roidbfile),'Need to specify the bounding boxes file')
   
-  local dt = matio.load(roidbfile)
-  
+  local dt
+  if paths.extname(roidbfile) == 'mat' then
+    dt = matio.load(roidbfile)
+  else
+    dt = torch.load(roidbfile)
+    -- remove file extension if present
+    for i=1, #dt.images do
+      local n = dt.images[i]
+      dt.images[i] = paths.basename(n, paths.extname(n))
+    end
+  end
+
   self.roidb = {}
   local img2roidb = {}
   -- compat: change coordinate order from [y1 x1 y2 x2] to [x1 y1 x2 y2]
