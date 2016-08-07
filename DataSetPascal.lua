@@ -24,19 +24,6 @@ end
 
 --
 
-
-local env = require 'argcheck.env' -- retrieve argcheck environement
--- this is the default type function
--- which can be overrided by the user
-function env.istype(obj, typename)
-  local t = torch.type(obj)
-  if t:find('torch.*Tensor') then
-    return 'torch.Tensor' == typename
-  end
-  return torch.type(obj) == typename
-end
-
-
 local initcheck = argcheck{
   pack=true,
   noordered=true,
@@ -102,7 +89,7 @@ local initcheck = argcheck{
    help="Name of the dataset",
    opt = true}--[[,
   {name="image",
-   type="torch.Tensor",
+   type="torch.*Tensor",
    help="Dataset of one single image",
    opt = true}]]
 }

@@ -6,6 +6,7 @@ local argcheck = require 'argcheck'
 local env = require 'argcheck.env' -- retrieve argcheck environement
 -- this is the default type function
 -- which can be overrided by the user
+local old_istype = env.istype
 function env.istype(obj, typename)
   if typename == 'DataSet' then
     return obj and obj._isDataSet
@@ -57,6 +58,8 @@ local initcheck = argcheck{
    help="sample batches with random flips" 
   },
 }
+-- reset standard istype function
+env.istype = old_istype
 
 function BatchProvider:__init(...)
   parent.__init(self)

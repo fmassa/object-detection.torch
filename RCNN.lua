@@ -18,7 +18,7 @@ local initcheck = argcheck{
    default=false,
    help="force square crops"},
   {name="image_transformer",
-   type="nnf.ImageTransformer",
+   type="objdet.ImageTransformer",
    default=objdet.ImageTransformer{},
    help="Class to preprocess input images"},
   {name="max_batch_size",
@@ -34,7 +34,7 @@ local initcheck = argcheck{
    default=8,
    help="number of bbox croppings per thread"},
   {name="dataset",
-   type="nnf.DataSetPascal", -- change to allow other datasets
+   type="objdet.DataSetPascal", -- change to allow other datasets
    opt=true,
    help="A dataset class"},
 }
